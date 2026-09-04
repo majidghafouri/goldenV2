@@ -1,0 +1,51 @@
+# Gradle
+.gradle/
+build/
+*/build/
+*/captures/
+.gradle/
+gradlew
+gradlew.bat
+
+# Android
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.jks
+*.keystore
+local.properties
+*.iml
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.mvn/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kotlin
+*.kt.bin
+
+# Generated
+generated/
+captures/
+
+# Xray binary (not committed)
+core/vpn/libs/*.aar
+core/vpn/libs/*.so
+
+# Keystores
+*.jks
+*.keystore
+key.properties
+
+# Internal workspace
+.omo/
