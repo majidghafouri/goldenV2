@@ -23,6 +23,8 @@ local.properties
 *.jks
 *.keystore
 key.properties
+keystore.properties
+keystore/
 
 # IDE
 .idea/
