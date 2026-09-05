@@ -73,7 +73,9 @@ class LogsViewModel @Inject constructor(
     }
 
     fun onClearLogs() {
-        logUseCase.clearLogs()
+        viewModelScope.launch {
+            logUseCase.clearLogs()
+        }
     }
 
     fun onExportLogs() {

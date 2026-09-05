@@ -14,13 +14,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -30,7 +37,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,7 +81,7 @@ fun SettingsScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(bottom = 80.dp, vertical = 8.dp),
+            .padding(bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Top App Bar (using item with custom layout)
@@ -149,7 +162,7 @@ fun DnsSettingsSection(settings: com.goldenv2.core.domain.model.AppSettings, vie
                         value = settings.dnsServers.joinToString("\n"),
                         onValueChange = { viewModel.onDnsServersChanged(it.lines().map { it.trim() }.filter { it.isNotBlank() }.toList()) },
                         modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(100.dp),
-                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Text),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         visualTransformation = androidx.compose.ui.text.input.VisualTransformation.None
                     )
                 }
@@ -209,7 +222,7 @@ fun LocalProxySection(settings: com.goldenv2.core.domain.model.AppSettings, view
                         onValueChange = { viewModel.onLocalSocksPortChanged(it.toIntOrNull() ?: 10808) },
                         modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(150.dp),
                         singleLine = true,
-                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
 
@@ -222,7 +235,7 @@ fun LocalProxySection(settings: com.goldenv2.core.domain.model.AppSettings, view
                         onValueChange = { viewModel.onLocalHttpPortChanged(it.toIntOrNull() ?: 10809) },
                         modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(150.dp),
                         singleLine = true,
-                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
             }
@@ -286,7 +299,7 @@ fun ConnectionSettingsSection(settings: com.goldenv2.core.domain.model.AppSettin
                     onValueChange = { viewModel.onMtuChanged(it.toIntOrNull() ?: 1500) },
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(150.dp),
                     singleLine = true,
-                    keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
         }
@@ -369,7 +382,7 @@ fun SubscriptionSettingsSection(settings: com.goldenv2.core.domain.model.AppSett
                     onValueChange = { viewModel.onSubscriptionRefreshIntervalChanged(it.toIntOrNull() ?: 24) },
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(150.dp),
                     singleLine = true,
-                    keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
         }
@@ -402,7 +415,7 @@ fun LoggingSettingsSection(settings: com.goldenv2.core.domain.model.AppSettings,
                     onValueChange = { viewModel.onMaxLogEntriesChanged(it.toIntOrNull() ?: 1000) },
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(150.dp),
                     singleLine = true,
-                    keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
 
@@ -447,7 +460,7 @@ fun AdvancedSettingsSection(settings: com.goldenv2.core.domain.model.AppSettings
                     onValueChange = { viewModel.onBypassUidsChanged(it.split(",").map { it.trim().toIntOrNull() }.filterNotNull().toList()) },
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                     singleLine = true,
-                    keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
         }
@@ -456,6 +469,7 @@ fun AdvancedSettingsSection(settings: com.goldenv2.core.domain.model.AppSettings
 
 @Composable
 fun ImportExportSection(viewModel: SettingsViewModel) {
+    val context = LocalContext.current
     GoldenV2SectionHeader(title = "Configuration")
 
     GoldenV2Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -466,7 +480,8 @@ fun ImportExportSection(viewModel: SettingsViewModel) {
             ) {
                 OutlinedButton(onClick = {
                     val json = viewModel.onExportConfig()
-                    android.content.ClipboardManager.fromContext(androidx.compose.ui.platform.LocalContext.current).setText(json)
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("config", json))
                     // TODO: Show toast "Copied to clipboard"
                 }) {
                     Text("Export Config")
@@ -488,8 +503,7 @@ fun SettingRow(
     content: @Composable () -> Unit
 ) {
     Column(
-        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(vertical = 8.dp)
     ) {
         Column {
             Text(text = title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
@@ -501,19 +515,26 @@ fun SettingRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropdownSelector(
-    selected: Enum<*>,
+    selected: Any,
     options: List<String>,
     onSelected: (String) -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val selectedText = selected.name
+    val selectedText = selected.toString()
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    androidx.compose.material3.MenuAnchor { anchor ->
+    ExposedDropdownMenuBox(
+        expanded = menuExpanded,
+        onExpandedChange = { menuExpanded = it },
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(200.dp)
+    ) {
         OutlinedButton(
-            onClick = { anchor.open() },
-            modifier = androidx.compose.ui.Modifier.fillMaxWidth().width(200.dp),
+            onClick = { menuExpanded = true },
+            modifier = androidx.compose.ui.Modifier
+                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth(),
             content = {
                 Row(
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
@@ -522,25 +543,24 @@ fun DropdownSelector(
                 ) {
                     Text(text = selectedText, fontSize = 14.sp)
                     Icon(
-                        imageVector = androidx.compose.material.icons.default.ExpandMore,
+                        imageVector = Icons.Filled.ExpandMore,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         )
-        androidx.compose.material3.DropdownMenu(
-            expanded = anchor.isOpen,
-            onDismissRequest = { anchor.close() }
+        ExposedDropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false }
         ) {
             options.forEach { option ->
-                androidx.compose.material3.DropdownMenuItem(
+                DropdownMenuItem(
                     text = { Text(text = option) },
                     onClick = {
                         onSelected(option)
-                        anchor.close()
-                    },
-                    selected = option == selectedText
+                        menuExpanded = false
+                    }
                 )
             }
         }

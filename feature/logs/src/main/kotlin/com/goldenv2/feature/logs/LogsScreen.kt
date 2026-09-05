@@ -25,7 +25,26 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.MenuAnchorType
+
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,17 +86,17 @@ fun LogsScreen(
             title = { Text(text = "Logs", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             actions = {
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.Delete,
+                    icon = Icons.Filled.Delete,
                     contentDescription = "Clear Logs",
                     onClick = { viewModel.onClearLogs() }
                 )
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.Download,
+                    icon = Icons.Filled.Download,
                     contentDescription = "Export Logs",
                     onClick = { viewModel.onExportLogs() }
                 )
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.Speed,
+                    icon = Icons.Filled.Speed,
                     contentDescription = "Speed Test",
                     onClick = { viewModel.onSpeedTest() }
                 )
@@ -105,7 +124,7 @@ fun LogsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.default.BugReport,
+                        imageVector = Icons.Filled.BugReport,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         modifier = androidx.compose.ui.Modifier.size(64.dp)
@@ -129,6 +148,7 @@ fun LogsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterBar(
     filterLevel: LogLevel,
@@ -138,6 +158,7 @@ fun FilterBar(
     isAutoScroll: Boolean,
     onAutoScrollChanged: (Boolean) -> Unit
 ) {
+    var levelMenuExpanded by remember { mutableStateOf(false) }
     Card(
         modifier = androidx.compose.ui.Modifier
             .fillMaxWidth()
@@ -153,11 +174,11 @@ fun FilterBar(
                 onValueChange = onSearchQueryChanged,
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                 placeholder = { Text("Search logs…") },
-                leadingIcon = { Icon(imageVector = androidx.compose.material.icons.default.Search, contentDescription = null) },
+                leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = { onSearchQueryChanged("") }) {
-                            Icon(imageVector = androidx.compose.material.icons.default.Close, contentDescription = "Clear")
+                            Icon(imageVector = Icons.Filled.Close, contentDescription = "Clear")
                         }
                     }
                 },
@@ -172,10 +193,16 @@ fun FilterBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Log level filter
-                androidx.compose.material3.MenuAnchor { anchor ->
+                ExposedDropdownMenuBox(
+                    expanded = levelMenuExpanded,
+                    onExpandedChange = { levelMenuExpanded = it },
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
+                ) {
                     OutlinedButton(
-                        onClick = { anchor.open() },
-                        modifier = androidx.compose.ui.Modifier.weight(1f),
+                        onClick = { levelMenuExpanded = true },
+                        modifier = androidx.compose.ui.Modifier
+                            .menuAnchor(type = MenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth(),
                         content = {
                             Row(
                                 modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
@@ -184,25 +211,24 @@ fun FilterBar(
                             ) {
                                 Text(text = "Level: ${filterLevel.name}", fontSize = 12.sp)
                                 Icon(
-                                    imageVector = androidx.compose.material.icons.default.ExpandMore,
+                                    imageVector = Icons.Filled.ExpandMore,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     )
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = anchor.isOpen,
-                        onDismissRequest = { anchor.close() }
+                    ExposedDropdownMenu(
+                        expanded = levelMenuExpanded,
+                        onDismissRequest = { levelMenuExpanded = false }
                     ) {
                         LogLevel.values().forEach { level ->
-                            androidx.compose.material3.DropdownMenuItem(
+                            DropdownMenuItem(
                                 text = { Text(text = level.name) },
                                 onClick = {
                                     onFilterLevelChanged(level)
-                                    anchor.close()
-                                },
-                                selected = level == filterLevel
+                                    levelMenuExpanded = false
+                                }
                             )
                         }
                     }
@@ -222,13 +248,14 @@ fun FilterBar(
 
 @Composable
 fun LogItem(log: LogEntry) {
+    val context = LocalContext.current
     val timeFormat = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
     val time = timeFormat.format(java.util.Date(log.timestamp.toEpochMilli()))
 
     val levelColor = when (log.level) {
         LogLevel.Debug -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         LogLevel.Info -> MaterialTheme.colorScheme.primary
-        LogLevel.Warning -> Color.parseColor("#FF9800") // Orange
+        LogLevel.Warning -> Color(0xFFFF9800) // Orange
         LogLevel.Error -> MaterialTheme.colorScheme.error
     }
 
@@ -269,13 +296,12 @@ fun LogItem(log: LogEntry) {
                 }
 
                 IconButton(onClick = {
-                    android.content.ClipboardManager.fromContext(
-                        androidx.compose.ui.platform.LocalContext.current
-                    ).setText(log.toString())
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("log", log.toString()))
                     // TODO: Show toast "Copied"
                 }) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.default.ContentCopy,
+                        imageVector = Icons.Filled.ContentCopy,
                         contentDescription = "Copy",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -291,7 +317,7 @@ fun LogItem(log: LogEntry) {
                     .fillMaxWidth()
                     .padding(top = 4.dp, start = 24.dp),
                 maxLines = 5,
-                overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
 
             log.throwable?.let { throwable ->

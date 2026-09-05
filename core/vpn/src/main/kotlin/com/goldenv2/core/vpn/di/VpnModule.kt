@@ -1,7 +1,7 @@
 package com.goldenv2.core.vpn.di
 
 import com.goldenv2.core.vpn.service.VpnController
-import com.goldenv2.core.vpn.service.VpnServiceImpl
+import com.goldenv2.core.vpn.service.VpnControllerImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -14,5 +14,5 @@ object VpnModule {
 
     @Provides
     @Singleton
-    fun provideVpnController(service: VpnServiceImpl): VpnController = service
+    fun provideVpnController(impl: VpnControllerImpl): VpnController = impl
 }

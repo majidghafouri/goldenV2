@@ -33,8 +33,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VpnLock
 import androidx.compose.material3.TopAppBarDefaults
@@ -410,7 +412,7 @@ fun RuleItem(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Cloud,
+                            imageVector = Icons.Filled.Rule,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = androidx.compose.ui.Modifier.size(20.dp).padding(end = 12.dp)
@@ -434,7 +436,7 @@ fun RuleItem(
                         )
                         androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(start = 8.dp))
                         IconButton(onClick = onEditClick) {
-                            Icon(imageVector = Icons.Default.Create, contentDescription = "Edit")
+                            Icon(imageVector = Icons.Filled.Edit, contentDescription = "Edit")
                         }
                         IconButton(onClick = onDeleteClick) {
                             Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)

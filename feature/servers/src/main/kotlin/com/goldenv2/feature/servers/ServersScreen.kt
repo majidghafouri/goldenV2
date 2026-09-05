@@ -25,16 +25,36 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.goldenv2.core.domain.model.Protocol
@@ -68,17 +88,17 @@ fun ServersScreen(
             title = { Text(text = "Servers", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             actions = {
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.Add,
+                    icon = Icons.Filled.Add,
                     contentDescription = "Add Server",
                     onClick = { viewModel.onAddServer() }
                 )
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.CloudDownload,
+                    icon = Icons.Filled.CloudDownload,
                     contentDescription = "Add Subscription",
                     onClick = { viewModel.onAddSubscription() }
                 )
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.Refresh,
+                    icon = Icons.Filled.Refresh,
                     contentDescription = "Refresh All",
                     onClick = { viewModel.onRefreshAll() }
                 )
@@ -93,11 +113,11 @@ fun ServersScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             placeholder = { Text("Search servers…") },
-            leadingIcon = { Icon(imageVector = androidx.compose.material.icons.default.Search, contentDescription = null) },
+            leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
                 if (searchQuery.isNotBlank()) {
                     IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                        Icon(imageVector = androidx.compose.material.icons.default.Close, contentDescription = "Clear")
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = "Clear")
                     }
                 }
             },
@@ -117,7 +137,7 @@ fun ServersScreen(
             }
         } else if (uiState.subscriptions.isEmpty()) {
             GoldenV2EmptyState(
-                icon = androidx.compose.material.icons.default.CloudOff,
+                icon = Icons.Filled.CloudOff,
                 title = "No Subscriptions",
                 message = "Add a subscription URL or manually add servers to get started",
                 actionText = "Add Subscription",
@@ -167,7 +187,7 @@ fun SubscriptionSection(
     onDeleteServer: (Server) -> Unit,
     onDuplicateServer: (Server) -> Unit
 ) {
-    var expanded by androidx.compose.runtime.remember { mutableStateOf(true) }
+    var expanded by remember { mutableStateOf(true) }
 
     Column(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
         // Subscription Header
@@ -189,7 +209,7 @@ fun SubscriptionSection(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.default.Folder,
+                        imageVector = Icons.Filled.Folder,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = androidx.compose.ui.Modifier.size(24.dp).padding(end = 12.dp)
@@ -211,17 +231,17 @@ fun SubscriptionSection(
                         modifier = androidx.compose.ui.Modifier.padding(end = 8.dp)
                     )
                     GoldenV2IconButton(
-                        icon = androidx.compose.material.icons.default.Refresh,
+                        icon = Icons.Filled.Refresh,
                         contentDescription = "Refresh",
                         onClick = onRefresh
                     )
                     GoldenV2IconButton(
-                        icon = androidx.compose.material.icons.default.Delete,
+                        icon = Icons.Filled.Delete,
                         contentDescription = "Delete",
                         onClick = onDelete
                     )
                     Icon(
-                        imageVector = if (expanded) androidx.compose.material.icons.default.ExpandLess else androidx.compose.material.icons.default.ExpandMore,
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = androidx.compose.ui.Modifier.size(24.dp)
@@ -315,7 +335,7 @@ fun ServerItem(
                         fontWeight = FontWeight.Medium,
                         color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${server.address}:${server.port}",
@@ -341,7 +361,7 @@ fun ServerItem(
                 }
                 if (selected) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.default.CheckCircle,
+                        imageVector = Icons.Filled.CheckCircle,
                         contentDescription = "Selected",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = androidx.compose.ui.Modifier.size(20.dp).padding(start = 8.dp)
@@ -352,19 +372,18 @@ fun ServerItem(
     }
 }
 
-@Composable
 fun showServerContextMenu(server: Server) {
     // TODO: Implement context menu
 }
 
 private fun getProtocolIcon(protocol: Protocol): ImageVector {
     return when (protocol) {
-        Protocol.VMess -> androidx.compose.material.icons.default.Cloud
-        Protocol.VLESS -> androidx.compose.material.icons.default.CloudQueue
-        Protocol.Trojan -> androidx.compose.material.icons.default.Security
-        Protocol.Shadowsocks -> androidx.compose.material.icons.default.Lock
-        Protocol.Hysteria2 -> androidx.compose.material.icons.default.FlashOn
-        else -> androidx.compose.material.icons.default.Cloud
+        Protocol.VMess -> Icons.Filled.Cloud
+        Protocol.VLESS -> Icons.Filled.CloudQueue
+        Protocol.Trojan -> Icons.Filled.Security
+        Protocol.Shadowsocks -> Icons.Filled.Lock
+        Protocol.Hysteria2 -> Icons.Filled.FlashOn
+        else -> Icons.Filled.Cloud
     }
 }
 

@@ -19,6 +19,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.VpnLock
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -44,7 +63,8 @@ fun HomeScreen(
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     onNavigateToServers: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToLogs: () -> Unit
+    onNavigateToLogs: () -> Unit,
+    onRequestVpnPermission: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -58,8 +78,8 @@ fun HomeScreen(
         TopAppBar(
             title = { Text(text = "GoldenV2", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             actions = {
-                GoldenV2IconButton(
-icon = androidx.compose.material.icons.default.Settings,
+GoldenV2IconButton(
+                    icon = Icons.Filled.Settings,
                     contentDescription = "Settings",
                     onClick = onNavigateToSettings
                 )
@@ -73,7 +93,7 @@ icon = androidx.compose.material.icons.default.Settings,
             onConnectClick = { viewModel.onConnectClick() },
             onServerClick = { onNavigateToServers() },
             vpnPermissionGranted = uiState.vpnPermissionGranted,
-            onPermissionClick = { viewModel::requestVpnPermission.invoke() }
+            onPermissionClick = onRequestVpnPermission
         )
 
         // Live Stats Card
@@ -109,6 +129,9 @@ fun ConnectionStatusCard(
     val isConnecting = connectionState.isConnecting
     val status = connectionState.status
 
+    val colorScheme = MaterialTheme.colorScheme
+    val statusColor = getStatusColor(status)
+
     GoldenV2Card(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(
             modifier = androidx.compose.ui.Modifier.padding(24.dp),
@@ -127,22 +150,22 @@ fun ConnectionStatusCard(
 
                     // Track
                     drawCircle(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = colorScheme.surfaceVariant,
                         radius = radius,
-                        style = androidx.compose.ui.draw.Stroke(width = strokeWidth),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
                         center = center
                     )
 
                     // Progress
                     val progress = if (isConnecting) (System.currentTimeMillis() % 2000) / 2000f else if (isConnected) 1f else 0f
                     drawArc(
-                        color = getStatusColor(status),
+                        color = statusColor,
                         startAngle = -90f,
                         sweepAngle = progress * 360f,
                         useCenter = false,
-                        radius = radius,
-                        style = androidx.compose.ui.draw.Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-                        center = center
+                        topLeft = center - androidx.compose.ui.geometry.Offset(radius, radius),
+                        size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     )
                 }
 
@@ -150,7 +173,7 @@ fun ConnectionStatusCard(
                 Icon(
                     imageVector = getStatusIcon(status),
                     contentDescription = null,
-                    tint = getStatusColor(status),
+                    tint = statusColor,
                     modifier = androidx.compose.ui.Modifier.size(48.dp)
                 )
             }
@@ -174,7 +197,7 @@ fun ConnectionStatusCard(
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             } else {
                 androidx.compose.material3.TextButton(onClick = onServerClick) {
@@ -251,23 +274,26 @@ fun LiveStatsCard(
                 StatItem(
                     label = "Uptime",
                     value = connectionState.formattedUptime,
-                    icon = androidx.compose.material.icons.default.AccessTime
+                    icon = Icons.Filled.AccessTime,
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
                 )
                 StatItem(
                     label = "↑ Upload",
                     value = connectionState.formattedUploadSpeed,
-                    icon = androidx.compose.material.icons.default.ArrowUpward
+                    icon = Icons.Filled.ArrowUpward,
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
                 )
                 StatItem(
                     label = "↓ Download",
                     value = connectionState.formattedDownloadSpeed,
-                    icon = androidx.compose.material.icons.default.ArrowDownward
+                    icon = Icons.Filled.ArrowDownward,
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
                 )
             }
 
             androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(top = 16.dp))
 
-            androidx.compose.foundation.layout.Divider(
+            androidx.compose.material3.HorizontalDivider(
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
@@ -281,12 +307,14 @@ fun LiveStatsCard(
                 StatItem(
                     label = "Total ↑",
                     value = connectionState.formattedTotalUpload,
-                    icon = androidx.compose.material.icons.default.CloudUpload
+                    icon = Icons.Filled.CloudUpload,
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
                 )
                 StatItem(
                     label = "Total ↓",
                     value = connectionState.formattedTotalDownload,
-                    icon = androidx.compose.material.icons.default.CloudDownload
+                    icon = Icons.Filled.CloudDownload,
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
                 )
             }
         }
@@ -301,7 +329,7 @@ fun StatItem(
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
 ) {
     Column(
-        modifier = modifier.weight(1f),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -324,10 +352,10 @@ fun QuickActionsCard(
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                QuickActionButton(icon = androidx.compose.material.icons.default.Server, label = "Servers", onClick = onServersClick)
-                QuickActionButton(icon = androidx.compose.material.icons.default.Route, label = "Routing", onClick = onSettingsClick)
-                QuickActionButton(icon = androidx.compose.material.icons.default.BugReport, label = "Logs", onClick = onLogsClick)
-                QuickActionButton(icon = androidx.compose.material.icons.default.Settings, label = "Settings", onClick = onSettingsClick)
+                QuickActionButton(icon = Icons.Filled.Dns, label = "Servers", onClick = onServersClick)
+                QuickActionButton(icon = Icons.Filled.Route, label = "Routing", onClick = onSettingsClick)
+                QuickActionButton(icon = Icons.Filled.BugReport, label = "Logs", onClick = onLogsClick)
+                QuickActionButton(icon = Icons.Filled.Settings, label = "Settings", onClick = onSettingsClick)
             }
         }
     }
@@ -380,6 +408,7 @@ fun SelectedServerCard(
     }
 }
 
+@Composable
 private fun getStatusColor(status: VpnStatus): Color {
     return when (status) {
         VpnStatus.Connected -> MaterialTheme.colorScheme.primary
@@ -392,11 +421,11 @@ private fun getStatusColor(status: VpnStatus): Color {
 
 private fun getStatusIcon(status: VpnStatus): ImageVector {
     return when (status) {
-        VpnStatus.Connected -> androidx.compose.material.icons.default.VpnLock
-        VpnStatus.Connecting, VpnStatus.Reconnecting -> androidx.compose.material.icons.default.Sync
-        VpnStatus.Error -> androidx.compose.material.icons.default.Error
-        VpnStatus.PermissionRequired -> androidx.compose.material.icons.default.LockOpen
-        else -> androidx.compose.material.icons.default.VpnLock
+        VpnStatus.Connected -> Icons.Filled.VpnLock
+        VpnStatus.Connecting, VpnStatus.Reconnecting -> Icons.Filled.Sync
+        VpnStatus.Error -> Icons.Filled.Error
+        VpnStatus.PermissionRequired -> Icons.Filled.LockOpen
+        else -> Icons.Filled.VpnLock
     }
 }
 
@@ -413,11 +442,11 @@ private fun getStatusText(status: VpnStatus): String {
 
 private fun getProtocolIcon(protocol: com.goldenv2.core.domain.model.Protocol): ImageVector {
     return when (protocol) {
-        com.goldenv2.core.domain.model.Protocol.VMess -> androidx.compose.material.icons.default.Cloud
-        com.goldenv2.core.domain.model.Protocol.VLESS -> androidx.compose.material.icons.default.CloudQueue
-        com.goldenv2.core.domain.model.Protocol.Trojan -> androidx.compose.material.icons.default.Security
-        com.goldenv2.core.domain.model.Protocol.Shadowsocks -> androidx.compose.material.icons.default.Lock
-        com.goldenv2.core.domain.model.Protocol.Hysteria2 -> androidx.compose.material.icons.default.FlashOn
-        else -> androidx.compose.material.icons.default.Cloud
+        com.goldenv2.core.domain.model.Protocol.VMess -> Icons.Filled.Cloud
+        com.goldenv2.core.domain.model.Protocol.VLESS -> Icons.Filled.CloudQueue
+        com.goldenv2.core.domain.model.Protocol.Trojan -> Icons.Filled.Security
+        com.goldenv2.core.domain.model.Protocol.Shadowsocks -> Icons.Filled.Lock
+        com.goldenv2.core.domain.model.Protocol.Hysteria2 -> Icons.Filled.FlashOn
+        else -> Icons.Filled.Cloud
     }
 }

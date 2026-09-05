@@ -38,135 +38,91 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onDnsStrategyChanged(strategy: DnsStrategy) {
-        updateSettings { selected ->
-            selected.copy(dnsStrategy = strategy)
-        }
+        updateSettings { copy(dnsStrategy = strategy) }
     }
 
     fun onDnsServersChanged(servers: List<String>) {
-        updateSettings { selected ->
-            selected.copy(dnsServers = servers)
-        }
+        updateSettings { copy(dnsServers = servers) }
     }
 
     fun onFakeDnsChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(fakeDnsEnabled = enabled)
-        }
+        updateSettings { copy(fakeDnsEnabled = enabled) }
     }
 
     fun onFakeDnsRangeChanged(range: String) {
-        updateSettings { selected ->
-            selected.copy(fakeDnsIpRange = range)
-        }
+        updateSettings { copy(fakeDnsIpRange = range) }
     }
 
     fun onLocalSocksPortChanged(port: Int) {
-        updateSettings { selected ->
-            selected.copy(localSocksPort = port)
-        }
+        updateSettings { copy(localSocksPort = port) }
     }
 
     fun onLocalHttpPortChanged(port: Int) {
-        updateSettings { selected ->
-            selected.copy(localHttpPort = port)
-        }
+        updateSettings { copy(localHttpPort = port) }
     }
 
     fun onAllowLocalProxyChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(allowLocalProxy = enabled)
-        }
+        updateSettings { copy(allowLocalProxy = enabled) }
     }
 
     fun onAutoConnectOnBootChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(autoConnectOnBoot = enabled)
-        }
+        updateSettings { copy(autoConnectOnBoot = enabled) }
     }
 
     fun onAutoReconnectChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(autoReconnect = enabled)
-        }
+        updateSettings { copy(autoReconnect = enabled) }
     }
 
     fun onKillSwitchChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(killSwitchEnabled = enabled)
-        }
+        updateSettings { copy(killSwitchEnabled = enabled) }
     }
 
     fun onVpnModeChanged(mode: VpnMode) {
-        updateSettings { selected ->
-            selected.copy(vpnMode = mode)
-        }
+        updateSettings { copy(vpnMode = mode) }
     }
 
     fun onMtuChanged(mtu: Int) {
-        updateSettings { selected ->
-            selected.copy(mtu = mtu)
-        }
+        updateSettings { copy(mtu = mtu) }
     }
 
     fun onThemeChanged(theme: ThemeMode) {
-        updateSettings { selected ->
-            selected.copy(theme = theme)
-        }
+        updateSettings { copy(theme = theme) }
     }
 
     fun onLanguageChanged(language: String) {
-        updateSettings { selected ->
-            selected.copy(language = language)
-        }
+        updateSettings { copy(language = language) }
     }
 
     fun onShowSpeedInNotificationChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(showSpeedInNotification = enabled)
-        }
+        updateSettings { copy(showSpeedInNotification = enabled) }
     }
 
     fun onShowNotificationChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(showNotification = enabled)
-        }
+        updateSettings { copy(showNotification = enabled) }
     }
 
     fun onSubscriptionAutoRefreshChanged(enabled: Boolean) {
-        updateSettings { selected ->
-            selected.copy(subscriptionAutoRefresh = enabled)
-        }
+        updateSettings { copy(subscriptionAutoRefresh = enabled) }
     }
 
     fun onSubscriptionRefreshIntervalChanged(hours: Int) {
-        updateSettings { selected ->
-            selected.copy(subscriptionRefreshIntervalHours = hours)
-        }
+        updateSettings { copy(subscriptionRefreshIntervalHours = hours) }
     }
 
     fun onLogLevelChanged(level: LogLevel) {
-        updateSettings { selected ->
-            selected.copy(logLevel = level)
-        }
+        updateSettings { copy(logLevel = level) }
     }
 
     fun onMaxLogEntriesChanged(entries: Int) {
-        updateSettings { selected ->
-            selected.copy(maxLogEntries = entries)
-        }
+        updateSettings { copy(maxLogEntries = entries) }
     }
 
     fun onBypassPackageNamesChanged(packages: List<String>) {
-        updateSettings { selected ->
-            selected.copy(bypassPackageNames = packages)
-        }
+        updateSettings { copy(bypassPackageNames = packages) }
     }
 
     fun onBypassUidsChanged(uids: List<Int>) {
-        updateSettings { selected ->
-            selected.copy(bypassUids = uids)
-        }
+        updateSettings { copy(bypassUids = uids) }
     }
 
     fun onImportConfig(json: String) {

@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -12,28 +11,23 @@ import android.net.VpnService
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.goldenv2.core.domain.model.ConnectionState
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.VpnStatus
 import com.goldenv2.core.vpn.R
 import com.goldenv2.core.vpn.xray.XrayConfigBuilder
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
-import java.net.InetAddress
-import java.net.NetworkInterface
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
 
 interface VpnController {
     val connectionState: StateFlow<ConnectionState>
@@ -42,17 +36,16 @@ interface VpnController {
     suspend fun reconnect()
 }
 
-class VpnServiceImpl : VpnService(), VpnController {
+@AndroidEntryPoint
+class VpnServiceImpl : VpnService() {
 
-    private val _connectionState = MutableStateFlow(ConnectionState())
-    override val connectionState: StateFlow<ConnectionState> = _connectionState
+    @Inject
+    lateinit var controller: VpnControllerImpl
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var xrayProcess: Process? = null
     private val isRunning = AtomicBoolean(false)
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.IO + job)
-    private val statsChannel = Channel<Pair<Long, Long>>(10) // upload, download
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Notification
     private val NOTIFICATION_ID = 1001
@@ -87,66 +80,66 @@ class VpnServiceImpl : VpnService(), VpnController {
                 startForeground(NOTIFICATION_ID, notification)
             }
         }
+        if (intent?.action == ACTION_CONNECT) {
+            scope.launch { establishTunnel() }
+        }
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override suspend fun start(server: Server) {
+    private suspend fun establishTunnel() {
+        val server = controller.consumePendingServer() ?: return
         if (isRunning.get()) return
 
-        _connectionState.update { it.copy(status = VpnStatus.Connecting, currentServer = server) }
+        try {
+            val settings = getSettings()
+            val config = XrayConfigBuilder.buildConfig(server, settings, getRoutingConfig())
 
-        scope.launch {
-            try {
-                val settings = getSettings()
-                val config = XrayConfigBuilder.buildConfig(server, settings, getRoutingConfig())
+            // Write config to file
+            val configFile = File(filesDir, "xray_config.json")
+            FileOutputStream(configFile).use { it.write(config.toByteArray()) }
 
-                // Write config to file
-                val configFile = File(filesDir, "xray_config.json")
-                FileOutputStream(configFile).use { it.write(config.toByteArray()) }
+            // Start VPN interface
+            val builder = Builder()
+                .setSession("GoldenV2 VPN")
+                .addAddress("10.0.0.1", 24)
+                .addRoute("0.0.0.0", 0)
+                .addDnsServer("1.1.1.1")
+                .addDnsServer("8.8.8.8")
+                .setMtu(1500)
 
-                // Start VPN interface
-                val builder = Builder()
-                    .setSession("GoldenV2 VPN")
-                    .addAddress("10.0.0.1", 24)
-                    .addRoute("0.0.0.0", 0)
-                    .addDnsServer("1.1.1.1")
-                    .addDnsServer("8.8.8.8")
-                    .setMtu(1500)
+            // Exclude local networks
+            addExcludedRoutes(builder)
 
-                // Exclude local networks
-                addExcludedRoutes(builder)
+            vpnInterface = builder.establish()
 
-                vpnInterface = builder.establish()
-
-                if (vpnInterface == null) {
-                    throw IllegalStateException("Failed to establish VPN interface")
-                }
-
-                // Start Xray process
-                startXrayProcess(configFile.absolutePath)
-
-                isRunning.set(true)
-                val connectedAt = java.time.Instant.now()
-
-                _connectionState.update {
-                    it.copy(
-                        status = VpnStatus.Connected,
-                        currentServer = server,
-                        connectedAt = connectedAt,
-                        totalUpload = 0,
-                        totalDownload = 0
-                    )
-                }
-
-                // Start stats monitoring
-                startStatsMonitoring()
-
-            } catch (e: Exception) {
-                _connectionState.update { it.copy(status = VpnStatus.Error, lastError = e.message) }
-                stop()
+            if (vpnInterface == null) {
+                throw IllegalStateException("Failed to establish VPN interface")
             }
+
+            // Start Xray process
+            startXrayProcess(configFile.absolutePath)
+
+            isRunning.set(true)
+            val connectedAt = java.time.Instant.now()
+
+            controller.updateState {
+                it.copy(
+                    status = VpnStatus.Connected,
+                    currentServer = server,
+                    connectedAt = connectedAt,
+                    totalUpload = 0,
+                    totalDownload = 0
+                )
+            }
+
+            // Start stats monitoring
+            startStatsMonitoring()
+
+        } catch (e: Exception) {
+            controller.updateState { it.copy(status = VpnStatus.Error, lastError = e.message) }
+            teardown()
         }
     }
 
@@ -231,7 +224,7 @@ class VpnServiceImpl : VpnService(), VpnController {
                     lastDownload += simulatedDownload
                     lastTime = currentTime
 
-                    _connectionState.update {
+                    controller.updateState {
                         it.copy(
                             uploadSpeed = if (elapsed > 0) (simulatedUpload / elapsed).toLong() else 0,
                             downloadSpeed = if (elapsed > 0) (simulatedDownload / elapsed).toLong() else 0,
@@ -250,7 +243,7 @@ class VpnServiceImpl : VpnService(), VpnController {
     }
 
     private fun updateNotification() {
-        val state = _connectionState.value
+        val state = controller.connectionState.value
         val server = state.currentServer
         val notification = buildNotification(
             server?.name ?: "GoldenV2 VPN",
@@ -307,10 +300,8 @@ class VpnServiceImpl : VpnService(), VpnController {
         }
     }
 
-    override suspend fun stop() {
-        if (!isRunning.getAndSet(false)) return
-
-        job.cancel()
+    private fun teardown() {
+        isRunning.set(false)
         xrayProcess?.destroy()
         xrayProcess = null
 
@@ -321,31 +312,21 @@ class VpnServiceImpl : VpnService(), VpnController {
         }
         vpnInterface = null
 
-        _connectionState.update { it.copy(status = VpnStatus.Disconnected, currentServer = null, connectedAt = null) }
-
         val nm = getSystemService(NotificationManager::class.java)
         nm.cancel(NOTIFICATION_ID)
         stopForeground(true)
     }
 
-    override suspend fun reconnect() {
-        val server = _connectionState.value.currentServer
-        stop()
-        if (server != null) {
-            kotlinx.coroutines.delay(1000)
-            start(server)
-        }
-    }
-
     override fun onDestroy() {
         scope.coroutineContext.cancelChildren()
-        runBlocking {
-            stop()
-        }
+        teardown()
         super.onDestroy()
     }
 
     companion object {
+        const val ACTION_CONNECT = "com.goldenv2.core.vpn.action.CONNECT"
+        const val ACTION_STOP = "com.goldenv2.core.vpn.action.STOP"
+
         fun prepare(context: Context): Boolean {
             val intent = VpnService.prepare(context)
             return intent == null

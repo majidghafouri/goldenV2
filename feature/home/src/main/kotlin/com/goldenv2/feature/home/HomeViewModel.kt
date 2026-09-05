@@ -62,7 +62,7 @@ class HomeViewModel @Inject constructor(
                 state.selectedServer?.let { server ->
                     if (!_vpnPermissionGranted.value) {
                         // Request VPN permission
-                        return@when
+                        return
                     }
                     connectToServer(server)
                 }
@@ -102,7 +102,7 @@ class HomeViewModel @Inject constructor(
     fun onVpnPermissionDenied() {
         _vpnPermissionGranted.value = false
         _uiState.update { it.copy(connectionState = it.connectionState.copy(status = VpnStatus.PermissionRequired)) }
-        logUseCase.w("HomeViewModel", "VPN permission denied")
+        viewModelScope.launch { logUseCase.w("HomeViewModel", "VPN permission denied") }
     }
 
     fun onServerSelected(server: Server) {

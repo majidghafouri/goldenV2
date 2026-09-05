@@ -6,9 +6,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -25,8 +27,10 @@ import com.goldenv2.feature.servers.ServersScreen
 import com.goldenv2.feature.servers.ServersViewModel
 import com.goldenv2.feature.settings.SettingsScreen
 import com.goldenv2.feature.settings.SettingsViewModel
+import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val homeViewModel: HomeViewModel by viewModels()
@@ -42,7 +46,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             GoldenV2Theme {
                 Surface(
-                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
@@ -52,7 +56,8 @@ class MainActivity : ComponentActivity() {
                                 viewModel = homeViewModel,
                                 onNavigateToServers = { navController.navigate("servers") },
                                 onNavigateToSettings = { navController.navigate("settings") },
-                                onNavigateToLogs = { navController.navigate("logs") }
+                                onNavigateToLogs = { navController.navigate("logs") },
+                                onRequestVpnPermission = { requestVpnPermission() }
                             )
                         }
                         composable("servers") {
