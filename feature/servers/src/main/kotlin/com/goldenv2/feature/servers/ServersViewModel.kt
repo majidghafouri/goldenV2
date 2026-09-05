@@ -91,14 +91,16 @@ class ServersViewModel @Inject constructor(
 
             val result = subscriptionFetcher.fetchAndParse(subscription.url, subscription.id)
 
-            result.onSuccess { servers ->
-                serverManagementUseCase.deleteBySubscription(subscription.id)
-                serverManagementUseCase.addServers(servers)
-                subscriptionUseCase.updateRefreshResult(subscription, true, servers.size)
-                logUseCase.i("ServersViewModel", "Refreshed ${servers.size} servers from ${subscription.name}")
-            }.onFailure { e ->
-                subscriptionUseCase.updateRefreshResult(subscription, false, 0, e.message)
-                logUseCase.e("ServersViewModel", "Failed to refresh subscription", e)
+            try {
+                result.onSuccess { servers ->
+                    serverManagementUseCase.deleteBySubscription(subscription.id)
+                    serverManagementUseCase.addServers(servers)
+                    subscriptionUseCase.updateRefreshResult(subscription, true, servers.size)
+                    logUseCase.i("ServersViewModel", "Refreshed ${servers.size} servers from ${subscription.name}")
+                }.onFailure { e ->
+                    subscriptionUseCase.updateRefreshResult(subscription, false, 0, e.message)
+                    logUseCase.e("ServersViewModel", "Failed to refresh subscription", e)
+                }
             } finally {
                 _uiState.update { it.copy(isLoading = false) }
             }
@@ -124,11 +126,15 @@ class ServersViewModel @Inject constructor(
     }
 
     fun onToggleSubscriptionEnabled(subscription: Subscription) {
-        subscriptionUseCase.toggleEnabled(subscription)
+        viewModelScope.launch {
+            subscriptionUseCase.toggleEnabled(subscription)
+        }
     }
 
     fun onSelectServer(server: Server) {
-        serverManagementUseCase.selectServer(server.id)
+        viewModelScope.launch {
+            serverManagementUseCase.selectServer(server.id)
+        }
     }
 
     fun onDeleteServer(server: Server) {

@@ -62,7 +62,7 @@ class HomeViewModel @Inject constructor(
                 state.selectedServer?.let { server ->
                     if (!_vpnPermissionGranted.value) {
                         // Request VPN permission
-                        return
+                        return@when
                     }
                     connectToServer(server)
                 }
@@ -72,6 +72,9 @@ class HomeViewModel @Inject constructor(
             }
             VpnStatus.PermissionRequired -> {
                 // Request VPN permission
+            }
+            else -> {
+                // Handle any unmatched status
             }
         }
     }

@@ -59,7 +59,7 @@ fun HomeScreen(
             title = { Text(text = "GoldenV2", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             actions = {
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.Settings,
+icon = androidx.compose.material.icons.default.Settings,
                     contentDescription = "Settings",
                     onClick = onNavigateToSettings
                 )
@@ -73,7 +73,7 @@ fun HomeScreen(
             onConnectClick = { viewModel.onConnectClick() },
             onServerClick = { onNavigateToServers() },
             vpnPermissionGranted = uiState.vpnPermissionGranted,
-            onPermissionClick = { viewModel.requestVpnPermission() }
+            onPermissionClick = { viewModel::requestVpnPermission.invoke() }
         )
 
         // Live Stats Card

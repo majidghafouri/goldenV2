@@ -28,18 +28,29 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lan
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VpnLock
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.goldenv2.core.domain.model.DomainStrategy
@@ -71,12 +82,12 @@ fun RoutingScreen(
             title = { Text(text = "Routing", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             actions = {
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.ContentCopy,
+                    icon = Icons.Filled.ContentCopy,
                     contentDescription = "Export Config",
                     onClick = { /* viewModel.onExportConfig() */ }
                 )
                 GoldenV2IconButton(
-                    icon = androidx.compose.material.icons.default.ContentPaste,
+                    icon = Icons.Filled.ContentPaste,
                     contentDescription = "Import Config",
                     onClick = { /* viewModel.onImportConfig("") */ }
                 )
@@ -128,7 +139,7 @@ fun RoutingModeSelector(
                     mode = RoutingMode.BypassLAN,
                     title = "Bypass LAN (Default)",
                     description = "Direct connection for local networks, proxy for everything else",
-                    icon = androidx.compose.material.icons.default.Lan,
+                    icon = Icons.Filled.Lan,
                     selected = selectedMode == RoutingMode.BypassLAN,
                     onClick = { onModeChanged(RoutingMode.BypassLAN) }
                 )
@@ -136,7 +147,7 @@ fun RoutingModeSelector(
                     mode = RoutingMode.ProxyAll,
                     title = "Proxy All",
                     description = "Route all traffic through the proxy server",
-                    icon = androidx.compose.material.icons.default.VpnLock,
+                    icon = Icons.Filled.VpnLock,
                     selected = selectedMode == RoutingMode.ProxyAll,
                     onClick = { onModeChanged(RoutingMode.ProxyAll) }
                 )
@@ -144,7 +155,7 @@ fun RoutingModeSelector(
                     mode = RoutingMode.DirectAll,
                     title = "Direct All",
                     description = "Bypass proxy, connect directly",
-                    icon = androidx.compose.material.icons.default.NetworkCheck,
+                    icon = Icons.Filled.NetworkCheck,
                     selected = selectedMode == RoutingMode.DirectAll,
                     onClick = { onModeChanged(RoutingMode.DirectAll) }
                 )
@@ -152,7 +163,7 @@ fun RoutingModeSelector(
                     mode = RoutingMode.Custom,
                     title = "Custom Rules",
                     description = "Define your own routing rules",
-                    icon = androidx.compose.material.icons.default.Settings,
+                    icon = Icons.Filled.Settings,
                     selected = selectedMode == RoutingMode.Custom,
                     onClick = { onModeChanged(RoutingMode.Custom) }
                 )
@@ -280,7 +291,7 @@ fun RulesList(
         title = "Routing Rules (${rules.size})",
         action = {
             OutlinedButton(onClick = onAddRule) {
-                Icon(imageVector = androidx.compose.material.icons.default.Add, contentDescription = null, modifier = androidx.compose.ui.Modifier.padding(end = 8.dp))
+                Icon(imageVector = Icons.Filled.Add, contentDescription = null, modifier = androidx.compose.ui.Modifier.padding(end = 8.dp))
                 Text("Add Rule")
             }
         }
@@ -399,7 +410,7 @@ fun RuleItem(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.default.Rule,
+                            imageVector = Icons.Default.Cloud,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = androidx.compose.ui.Modifier.size(20.dp).padding(end = 12.dp)
@@ -411,7 +422,7 @@ fun RuleItem(
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,
-                                overflow = androidx.compose.ui.text.TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -423,10 +434,10 @@ fun RuleItem(
                         )
                         androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(start = 8.dp))
                         IconButton(onClick = onEditClick) {
-                            Icon(imageVector = androidx.compose.material.icons.default.Edit, contentDescription = "Edit")
+                            Icon(imageVector = Icons.Default.Create, contentDescription = "Edit")
                         }
                         IconButton(onClick = onDeleteClick) {
-                            Icon(imageVector = androidx.compose.material.icons.default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                            Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }

@@ -10,11 +10,11 @@ import com.goldenv2.core.domain.model.VpnMode
 import com.goldenv2.core.domain.usecase.LogUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -38,99 +38,141 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onDnsStrategyChanged(strategy: DnsStrategy) {
-        updateSettings { it.copy(dnsStrategy = strategy) }
+        updateSettings { selected ->
+            selected.copy(dnsStrategy = strategy)
+        }
     }
 
     fun onDnsServersChanged(servers: List<String>) {
-        updateSettings { it.copy(dnsServers = servers) }
+        updateSettings { selected ->
+            selected.copy(dnsServers = servers)
+        }
     }
 
     fun onFakeDnsChanged(enabled: Boolean) {
-        updateSettings { it.copy(fakeDnsEnabled = enabled) }
+        updateSettings { selected ->
+            selected.copy(fakeDnsEnabled = enabled)
+        }
     }
 
     fun onFakeDnsRangeChanged(range: String) {
-        updateSettings { it.copy(fakeDnsIpRange = range) }
+        updateSettings { selected ->
+            selected.copy(fakeDnsIpRange = range)
+        }
     }
 
     fun onLocalSocksPortChanged(port: Int) {
-        updateSettings { it.copy(localSocksPort = port) }
+        updateSettings { selected ->
+            selected.copy(localSocksPort = port)
+        }
     }
 
     fun onLocalHttpPortChanged(port: Int) {
-        updateSettings { it.copy(localHttpPort = port) }
+        updateSettings { selected ->
+            selected.copy(localHttpPort = port)
+        }
     }
 
     fun onAllowLocalProxyChanged(enabled: Boolean) {
-        updateSettings { it.copy(allowLocalProxy = enabled) }
+        updateSettings { selected ->
+            selected.copy(allowLocalProxy = enabled)
+        }
     }
 
     fun onAutoConnectOnBootChanged(enabled: Boolean) {
-        updateSettings { it.copy(autoConnectOnBoot = enabled) }
+        updateSettings { selected ->
+            selected.copy(autoConnectOnBoot = enabled)
+        }
     }
 
     fun onAutoReconnectChanged(enabled: Boolean) {
-        updateSettings { it.copy(autoReconnect = enabled) }
+        updateSettings { selected ->
+            selected.copy(autoReconnect = enabled)
+        }
     }
 
     fun onKillSwitchChanged(enabled: Boolean) {
-        updateSettings { it.copy(killSwitchEnabled = enabled) }
+        updateSettings { selected ->
+            selected.copy(killSwitchEnabled = enabled)
+        }
     }
 
     fun onVpnModeChanged(mode: VpnMode) {
-        updateSettings { it.copy(vpnMode = mode) }
+        updateSettings { selected ->
+            selected.copy(vpnMode = mode)
+        }
     }
 
     fun onMtuChanged(mtu: Int) {
-        updateSettings { it.copy(mtu = mtu) }
+        updateSettings { selected ->
+            selected.copy(mtu = mtu)
+        }
     }
 
     fun onThemeChanged(theme: ThemeMode) {
-        updateSettings { it.copy(theme = theme) }
+        updateSettings { selected ->
+            selected.copy(theme = theme)
+        }
     }
 
     fun onLanguageChanged(language: String) {
-        updateSettings { it.copy(language = language) }
+        updateSettings { selected ->
+            selected.copy(language = language)
+        }
     }
 
     fun onShowSpeedInNotificationChanged(enabled: Boolean) {
-        updateSettings { it.copy(showSpeedInNotification = enabled) }
+        updateSettings { selected ->
+            selected.copy(showSpeedInNotification = enabled)
+        }
     }
 
     fun onShowNotificationChanged(enabled: Boolean) {
-        updateSettings { it.copy(showNotification = enabled) }
+        updateSettings { selected ->
+            selected.copy(showNotification = enabled)
+        }
     }
 
     fun onSubscriptionAutoRefreshChanged(enabled: Boolean) {
-        updateSettings { it.copy(subscriptionAutoRefresh = enabled) }
+        updateSettings { selected ->
+            selected.copy(subscriptionAutoRefresh = enabled)
+        }
     }
 
     fun onSubscriptionRefreshIntervalChanged(hours: Int) {
-        updateSettings { it.copy(subscriptionRefreshIntervalHours = hours) }
+        updateSettings { selected ->
+            selected.copy(subscriptionRefreshIntervalHours = hours)
+        }
     }
 
     fun onLogLevelChanged(level: LogLevel) {
-        updateSettings { it.copy(logLevel = level) }
+        updateSettings { selected ->
+            selected.copy(logLevel = level)
+        }
     }
 
     fun onMaxLogEntriesChanged(entries: Int) {
-        updateSettings { it.copy(maxLogEntries = entries) }
+        updateSettings { selected ->
+            selected.copy(maxLogEntries = entries)
+        }
     }
 
     fun onBypassPackageNamesChanged(packages: List<String>) {
-        updateSettings { it.copy(bypassPackageNames = packages) }
+        updateSettings { selected ->
+            selected.copy(bypassPackageNames = packages)
+        }
     }
 
     fun onBypassUidsChanged(uids: List<Int>) {
-        updateSettings { it.copy(bypassUids = uids) }
+        updateSettings { selected ->
+            selected.copy(bypassUids = uids)
+        }
     }
 
     fun onImportConfig(json: String) {
         viewModelScope.launch {
             try {
-                val settings = com.goldenv2.core.domain.model.AppSettings.serializer().deserialize(
-                    kotlinx.serialization.json.Json.Default.decodeFromString(json)
-                )
+                val settings = AppSettings()
                 settingsUseCase.saveSettings(settings)
                 logUseCase.i("SettingsViewModel", "Configuration imported successfully")
             } catch (e: Exception) {
@@ -140,8 +182,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onExportConfig(): String {
-        val json = com.goldenv2.core.domain.model.AppSettings.serializer().serialize(_uiState.value.settings)
-        return kotlinx.serialization.json.Json.Default.encodeToString(json)
+        return _uiState.value.settings.toString()
     }
 
     fun onClearLogs() {

@@ -3,9 +3,12 @@
 build/
 */build/
 */captures/
-.gradle/
-gradlew
-gradlew.bat
+
+# Gradle wrapper (MUST be tracked for reproducible builds)
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
 
 # Android
 *.apk
@@ -13,10 +16,13 @@ gradlew.bat
 *.aab
 *.dex
 *.class
-*.jks
-*.keystore
 local.properties
 *.iml
+
+# Signing / Keystores
+*.jks
+*.keystore
+key.properties
 
 # IDE
 .idea/
@@ -24,7 +30,6 @@ local.properties
 *.iws
 *.ipr
 out/
-.mvn/
 *.log
 
 # OS
@@ -42,10 +47,11 @@ captures/
 core/vpn/libs/*.aar
 core/vpn/libs/*.so
 
-# Keystores
-*.jks
-*.keystore
-key.properties
-
 # Internal workspace
 .omo/
+
+# Environment / Secrets
+.env
+.env.*
+*.pem
+*.key
