@@ -32,6 +32,8 @@ object XrayConfigBuilder {
         server: Server,
         settings: AppSettings,
         routing: RoutingConfig,
+        geoipPath: String = "",
+        geositePath: String = "",
         localPort: Int = 10808
     ): String {
         val config = jsonMapOf(
@@ -39,7 +41,7 @@ object XrayConfigBuilder {
             "dns" to buildDnsConfig(settings),
             "inbounds" to buildInbounds(server, settings, localPort),
             "outbounds" to buildOutbounds(server),
-            "routing" to buildRouting(routing)
+            "routing" to buildRouting(routing, geoipPath, geositePath)
         )
         return Json.Default.encodeToString(JsonObject.serializer(), config)
     }
@@ -328,7 +330,7 @@ object XrayConfigBuilder {
         ).let { json -> JsonObject(json.filterValues { it != JsonNull }) }
     }
 
-    private fun buildRouting(routing: RoutingConfig): JsonObject {
+    private fun buildRouting(routing: RoutingConfig, geoipPath: String, geositePath: String): JsonObject {
         val rules = routing.rules.map { rule ->
             val pairs = mutableListOf<Pair<String, Any?>>()
             pairs.add("type" to "field")
@@ -346,9 +348,13 @@ object XrayConfigBuilder {
             jsonMapOf(*pairs.toTypedArray())
         }
 
-        return jsonMapOf(
+        val routingObj = mutableMapOf<String, Any?>(
             "domainStrategy" to routing.domainStrategy.name,
             "rules" to rules
         )
+        if (geoipPath.isNotEmpty()) routingObj["geoip"] = jsonMapOf("path" to geoipPath)
+        if (geositePath.isNotEmpty()) routingObj["geosite"] = jsonMapOf("path" to geositePath)
+
+        return jsonMapOf(*routingObj.entries.map { it.key to it.value }.toTypedArray())
     }
 }

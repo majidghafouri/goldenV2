@@ -11,7 +11,9 @@ import com.goldenv2.core.domain.usecase.ServerManagementUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import com.goldenv2.core.vpn.service.VpnController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -33,21 +35,47 @@ class HomeViewModel @Inject constructor(
     private val _vpnPermissionGranted = MutableStateFlow(false)
     val vpnPermissionGranted: StateFlow<Boolean> = _vpnPermissionGranted
 
+    /**
+     * One-shot signal for the Activity to launch the system VPN permission
+     * dialog. Emitted on every app run when permission is missing, and on
+     * demand when the user taps Connect without permission.
+     */
+    private val _vpnPermissionRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val vpnPermissionRequest: SharedFlow<Unit> = _vpnPermissionRequest
+
     init {
         observeVpnState()
+        checkVpnPermission()
+    }
+
+    private fun checkVpnPermission() {
+        viewModelScope.launch {
+            val granted = vpnController.isVpnPermissionGranted()
+            _vpnPermissionGranted.value = granted
+            if (!granted) {
+                // Auto-ask on every app run when the user hasn't granted yet.
+                _vpnPermissionRequest.tryEmit(Unit)
+            } else {
+                logUseCase.i("HomeViewModel", "VPN permission already granted")
+            }
+        }
     }
 
     private fun observeVpnState() {
         viewModelScope.launch {
-            vpnController.connectionState
-                .combine(settingsUseCase.settingsFlow) { connectionState, settings ->
-                    HomeUiState(
-                        connectionState = connectionState,
-                        settings = settings,
-                        selectedServer = connectionState.currentServer,
-                        vpnPermissionGranted = _vpnPermissionGranted.value
-                    )
-                }
+            combine(
+                vpnController.connectionState,
+                settingsUseCase.settingsFlow,
+                serverUseCase.observeSelectedServer(),
+                _vpnPermissionGranted
+            ) { connectionState, settings, selectedServer, granted ->
+                HomeUiState(
+                    connectionState = connectionState,
+                    settings = settings,
+                    selectedServer = connectionState.currentServer ?: selectedServer,
+                    vpnPermissionGranted = granted
+                )
+            }
                 .distinctUntilChanged()
                 .collect { state ->
                     _uiState.value = state
@@ -59,23 +87,25 @@ class HomeViewModel @Inject constructor(
         val state = _uiState.value
         when (state.connectionState.status) {
             VpnStatus.Disconnected, VpnStatus.Error -> {
-                state.selectedServer?.let { server ->
-                    if (!_vpnPermissionGranted.value) {
-                        // Request VPN permission
-                        return
-                    }
+                val server = state.selectedServer
+                if (server == null) {
+                    // No server selected; UI falls back to navigating to the servers page.
+                    return
+                }
+                if (_vpnPermissionGranted.value) {
                     connectToServer(server)
+                } else {
+                    // Request permission first; onVpnPermissionGranted() will connect right after.
+                    requestVpnPermission()
                 }
             }
             VpnStatus.Connected, VpnStatus.Connecting, VpnStatus.Reconnecting -> {
                 disconnect()
             }
             VpnStatus.PermissionRequired -> {
-                // Request VPN permission
+                requestVpnPermission()
             }
-            else -> {
-                // Handle any unmatched status
-            }
+            else -> Unit
         }
     }
 
@@ -93,32 +123,22 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun requestVpnPermission() {
+        _vpnPermissionRequest.tryEmit(Unit)
+    }
+
     fun onVpnPermissionGranted() {
         _vpnPermissionGranted.value = true
         val state = _uiState.value
-        state.selectedServer?.let { connectToServer(it) }
+        if (state.connectionState.status != VpnStatus.Connected) {
+            state.selectedServer?.let { connectToServer(it) }
+        }
     }
 
     fun onVpnPermissionDenied() {
         _vpnPermissionGranted.value = false
         _uiState.update { it.copy(connectionState = it.connectionState.copy(status = VpnStatus.PermissionRequired)) }
         viewModelScope.launch { logUseCase.w("HomeViewModel", "VPN permission denied") }
-    }
-
-    fun onServerSelected(server: Server) {
-        _uiState.update { it.copy(selectedServer = server) }
-    }
-
-    fun onNavigateToServers() {
-        // Navigation handled by activity
-    }
-
-    fun onNavigateToSettings() {
-        // Navigation handled by activity
-    }
-
-    fun onNavigateToLogs() {
-        // Navigation handled by activity
     }
 }
 

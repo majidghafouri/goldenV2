@@ -1,10 +1,14 @@
 package com.goldenv2.feature.servers
 
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,16 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -33,26 +28,52 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,6 +86,7 @@ import com.goldenv2.core.ui.component.GoldenV2EmptyState
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
 import com.goldenv2.core.ui.theme.GoldenV2Theme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable
@@ -77,97 +99,424 @@ fun ServersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val localServers = uiState.servers.filter { it.subscriptionId.isBlank() }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(bottom = 80.dp)
-    ) {
-        // Top App Bar
-        TopAppBar(
-            title = { Text(text = "Servers", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-            actions = {
-                GoldenV2IconButton(
-                    icon = Icons.Filled.Add,
-                    contentDescription = "Add Server",
-                    onClick = { viewModel.onAddServer() }
-                )
-                GoldenV2IconButton(
-                    icon = Icons.Filled.CloudDownload,
-                    contentDescription = "Add Subscription",
-                    onClick = { viewModel.onAddSubscription() }
-                )
-                GoldenV2IconButton(
-                    icon = Icons.Filled.Refresh,
-                    contentDescription = "Refresh All",
-                    onClick = { viewModel.onRefreshAll() }
-                )
-            }
-        )
+    LaunchedEffect(uiState.importMessage) {
+        uiState.importMessage?.let { message ->
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+            viewModel.onImportMessageShown()
+        }
+    }
 
-        // Search Bar
-        androidx.compose.material3.TextField(
-            value = searchQuery,
-            onValueChange = { viewModel.onSearchQueryChanged(it) },
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
             modifier = androidx.compose.ui.Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Search servers…") },
-            leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
-            trailingIcon = {
-                if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                        Icon(imageVector = Icons.Filled.Close, contentDescription = "Clear")
+                .fillMaxSize()
+                .padding(bottom = 80.dp)
+        ) {
+            // Top App Bar
+            TopAppBar(
+                title = { Text(text = "Servers", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+                actions = {
+                    GoldenV2IconButton(
+                        icon = Icons.Filled.Add,
+                        contentDescription = "Add Server",
+                        onClick = { viewModel.onAddServer() }
+                    )
+                    GoldenV2IconButton(
+                        icon = Icons.Filled.CloudDownload,
+                        contentDescription = "Add Subscription",
+                        onClick = { viewModel.onAddSubscription() }
+                    )
+                    GoldenV2IconButton(
+                        icon = Icons.Filled.Refresh,
+                        contentDescription = "Refresh All",
+                        onClick = { viewModel.onRefreshAll() }
+                    )
+                }
+            )
+
+            // Search Bar
+            androidx.compose.material3.TextField(
+                value = searchQuery,
+                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Search servers…") },
+                leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                            Icon(imageVector = Icons.Filled.Close, contentDescription = "Clear")
+                        }
+                    }
+                },
+                colors = androidx.compose.material3.TextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
+            )
+
+            // Server List
+            if (uiState.isLoading) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator()
+                }
+            } else if (uiState.subscriptions.isEmpty() && localServers.isEmpty()) {
+                Column(
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    GoldenV2EmptyState(
+                        icon = Icons.Filled.CloudOff,
+                        title = "No Servers",
+                        message = "Add a subscription URL, import from clipboard, or enter a server link to get started",
+                        actionText = "Add Subscription",
+                        onAction = { viewModel.onAddSubscription() }
+                    )
+                    Spacer(modifier = androidx.compose.ui.Modifier.height(8.dp))
+                    TextButton(onClick = { viewModel.onAddServer() }) {
+                        Text(text = "Add a server", fontWeight = FontWeight.Medium)
                     }
                 }
-            },
-            colors = androidx.compose.material3.TextFieldDefaults.colors(
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        )
-
-        // Server List
-        if (uiState.isLoading) {
-            androidx.compose.foundation.layout.Box(
-                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.CircularProgressIndicator()
-            }
-        } else if (uiState.subscriptions.isEmpty()) {
-            GoldenV2EmptyState(
-                icon = Icons.Filled.CloudOff,
-                title = "No Subscriptions",
-                message = "Add a subscription URL or manually add servers to get started",
-                actionText = "Add Subscription",
-                onAction = { viewModel.onAddSubscription() }
-            )
-        } else {
-            LazyColumn(
-                modifier = androidx.compose.ui.Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                uiState.subscriptions.forEach { subscription ->
-                    val servers = uiState.groupedServers[subscription] ?: emptyList()
-                    if (servers.isNotEmpty() || subscription.isEnabled) {
-                        item(key = subscription.id) {
-                            SubscriptionSection(
-                                subscription = subscription,
-                                servers = servers,
-                                onRefresh = { viewModel.onRefreshSubscription(subscription) },
-                                onToggleEnabled = { viewModel.onToggleSubscriptionEnabled(subscription) },
-                                onDelete = { viewModel.onDeleteSubscription(subscription) },
+            } else {
+                LazyColumn(
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (localServers.isNotEmpty()) {
+                        item(key = "local") {
+                            LocalServersSection(
+                                servers = localServers,
                                 onServerClick = { server -> viewModel.onSelectServer(server) },
-                                onServerLongClick = { server -> showServerContextMenu(server) },
                                 onTestLatency = { server -> viewModel.onTestLatency(server) },
                                 onDeleteServer = { server -> viewModel.onDeleteServer(server) },
                                 onDuplicateServer = { server -> viewModel.onDuplicateServer(server) }
                             )
                         }
                     }
+                    uiState.subscriptions.forEach { subscription ->
+                        val servers = uiState.groupedServers[subscription] ?: emptyList()
+                        if (servers.isNotEmpty() || subscription.isEnabled) {
+                            item(key = subscription.id) {
+                                SubscriptionSection(
+                                    subscription = subscription,
+                                    servers = servers,
+                                    onRefresh = { viewModel.onRefreshSubscription(subscription) },
+                                    onToggleEnabled = { viewModel.onToggleSubscriptionEnabled(subscription) },
+                                    onDelete = { viewModel.onDeleteSubscription(subscription) },
+                                    onServerClick = { server -> viewModel.onSelectServer(server) },
+                                    onServerLongClick = { server -> showServerContextMenu(server) },
+                                    onTestLatency = { server -> viewModel.onTestLatency(server) },
+                                    onDeleteServer = { server -> viewModel.onDeleteServer(server) },
+                                    onDuplicateServer = { server -> viewModel.onDuplicateServer(server) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = androidx.compose.ui.Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+        )
+    }
+
+    if (uiState.showAddServerSheet) {
+        AddServerSheet(
+            onDismiss = viewModel::onDismissAddServerSheet,
+            onFromClipboard = viewModel::onAddFromClipboard,
+            onManualEntry = viewModel::onOpenManualEntry,
+            onQrScanner = viewModel::onOpenQrScanner
+        )
+    }
+    if (uiState.showManualEntry) {
+        ManualEntrySheet(
+            onDismiss = viewModel::onDismissManualEntry,
+            onAdd = viewModel::onImportConfig
+        )
+    }
+    if (uiState.showQrScanner) {
+        QrScannerSheet(
+            onDismiss = viewModel::onDismissQrScanner,
+            onResult = viewModel::onQrScanned
+        )
+    }
+    if (uiState.showAddSubscriptionDialog) {
+        AddSubscriptionDialog(
+            onDismiss = viewModel::onDismissAddSubscriptionDialog,
+            onAdd = viewModel::onAddSubscriptionUrl
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddServerSheet(
+    onDismiss: () -> Unit,
+    onFromClipboard: (String?) -> Unit,
+    onManualEntry: () -> Unit,
+    onQrScanner: () -> Unit
+) {
+    val context = LocalContext.current
+    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = "Add Server",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = androidx.compose.ui.Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+            )
+            ListItem(
+                headlineContent = { Text("From clipboard") },
+                supportingContent = { Text("Paste a server link from your clipboard") },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Filled.ContentPaste,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                modifier = androidx.compose.ui.Modifier.clickable {
+                    val text = clipboardManager.primaryClip
+                        ?.getItemAt(0)
+                        ?.coerceToText(context)
+                        ?.toString()
+                    onDismiss()
+                    onFromClipboard(text)
+                }
+            )
+            ListItem(
+                headlineContent = { Text("Enter manually") },
+                supportingContent = { Text("Type or paste server link(s), one per line") },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                modifier = androidx.compose.ui.Modifier.clickable {
+                    onManualEntry()
+                }
+            )
+            ListItem(
+                headlineContent = { Text("Scan QR code") },
+                supportingContent = { Text("Scan a QR code containing a server link") },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Filled.QrCodeScanner,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                modifier = androidx.compose.ui.Modifier.clickable {
+                    onQrScanner()
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualEntrySheet(
+    onDismiss: () -> Unit,
+    onAdd: (String) -> Unit
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = "Add Server Manually",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                minLines = 4,
+                maxLines = 10,
+                placeholder = { Text("vless://…  vmess://…  ss://…  trojan://…") },
+                supportingText = {
+                    Text("One server link per line, or paste base64 subscription content")
+                }
+            )
+            Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    onDismiss()
+                    onAdd(text)
+                },
+                enabled = text.isNotBlank(),
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+            ) {
+                Text("Add servers")
+            }
+            Spacer(modifier = androidx.compose.ui.Modifier.height(24.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QrScannerSheet(
+    onDismiss: () -> Unit,
+    onResult: (String) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        QrScannerContent(
+            onResult = onResult,
+            onClose = onDismiss
+        )
+    }
+}
+
+@Composable
+private fun AddSubscriptionDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String) -> Unit
+) {
+    var url by rememberSaveable { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Subscription") },
+        text = {
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                placeholder = { Text("https://example.com/subscribe") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onDismiss()
+                    onAdd(url)
+                },
+                enabled = url.isNotBlank()
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun LocalServersSection(
+    servers: List<Server>,
+    onServerClick: (Server) -> Unit,
+    onTestLatency: (Server) -> Unit,
+    onDeleteServer: (Server) -> Unit,
+    onDuplicateServer: (Server) -> Unit
+) {
+    var expanded by remember { mutableStateOf(true) }
+
+    Column(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+        Card(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            onClick = { expanded = !expanded }
+        ) {
+            Row(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = androidx.compose.ui.Modifier.size(24.dp).padding(end = 12.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "Local",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${servers.size} servers • No subscription",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = androidx.compose.ui.Modifier.size(24.dp)
+                )
+            }
+        }
+
+        if (expanded) {
+            Column(
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                servers.forEach { server ->
+                    ServerItem(
+                        server = server,
+                        onClick = { onServerClick(server) },
+                        onLongClick = { showServerContextMenu(server) },
+                        onTestLatency = { onTestLatency(server) },
+                        onDelete = { onDeleteServer(server) },
+                        onDuplicate = { onDuplicateServer(server) }
+                    )
                 }
             }
         }
@@ -271,11 +620,11 @@ fun SubscriptionSection(
                     }
                 }
             } else {
-                LazyColumn(
+                Column(
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(servers) { server ->
+                    servers.forEach { server ->
                         ServerItem(
                             server = server,
                             onClick = { onServerClick(server) },

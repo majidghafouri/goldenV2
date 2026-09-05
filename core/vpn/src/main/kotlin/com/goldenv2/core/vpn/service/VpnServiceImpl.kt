@@ -31,6 +31,7 @@ import javax.inject.Inject
 
 interface VpnController {
     val connectionState: StateFlow<ConnectionState>
+    fun isVpnPermissionGranted(): Boolean
     suspend fun start(server: Server)
     suspend fun stop()
     suspend fun reconnect()
@@ -45,6 +46,7 @@ class VpnServiceImpl : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var xrayProcess: Process? = null
     private val isRunning = AtomicBoolean(false)
+    private val stopRequested = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Notification
@@ -53,22 +55,60 @@ class VpnServiceImpl : VpnService() {
 
     // Xray binary path - TODO: Replace with actual Xray-core AAR integration
     private var xrayBinaryPath: String? = null
+    private var geoipPath: String? = null
+    private var geositePath: String? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        findXrayBinary()
+        extractXrayAssets()
     }
 
-    private fun findXrayBinary() {
-        // TODO: When Xray-core AAR is added, this should point to the extracted binary
-        // For now, we look in common locations
-        val possiblePaths = listOf(
-            filesDir.absolutePath + "/xray",
-            cacheDir.absolutePath + "/xray",
-            "/data/local/tmp/xray"
-        )
-        xrayBinaryPath = possiblePaths.firstOrNull { File(it).exists() }
+    private fun extractXrayAssets() {
+        val xrayFile = File(filesDir, "xray")
+        val geoipFile = File(filesDir, "geoip.dat")
+        val geositeFile = File(filesDir, "geosite.dat")
+
+        if (!xrayFile.exists() || !geoipFile.exists() || !geositeFile.exists()) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    if (!xrayFile.exists()) {
+                        assets.open("xray").use { input ->
+                            FileOutputStream(xrayFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        xrayFile.setExecutable(true)
+                    }
+
+                    if (!geoipFile.exists()) {
+                        assets.open("geoip.dat").use { input ->
+                            FileOutputStream(geoipFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+
+                    if (!geositeFile.exists()) {
+                        assets.open("geosite.dat").use { input ->
+                            FileOutputStream(geositeFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+
+                    xrayBinaryPath = xrayFile.absolutePath
+                    geoipPath = geoipFile.absolutePath
+                    geositePath = geositeFile.absolutePath
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } else {
+            xrayBinaryPath = xrayFile.absolutePath
+            geoipPath = geoipFile.absolutePath
+            geositePath = geositeFile.absolutePath
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -82,6 +122,11 @@ class VpnServiceImpl : VpnService() {
         }
         if (intent?.action == ACTION_CONNECT) {
             scope.launch { establishTunnel() }
+        } else if (intent?.action == ACTION_STOP) {
+            scope.launch {
+                teardown()
+                stopSelf()
+            }
         }
         return START_STICKY
     }
@@ -93,8 +138,15 @@ class VpnServiceImpl : VpnService() {
         if (isRunning.get()) return
 
         try {
+            stopRequested.set(false)
             val settings = getSettings()
-            val config = XrayConfigBuilder.buildConfig(server, settings, getRoutingConfig())
+            val config = XrayConfigBuilder.buildConfig(
+                server,
+                settings,
+                getRoutingConfig(),
+                geoipPath ?: "",
+                geositePath ?: ""
+            )
 
             // Write config to file
             val configFile = File(filesDir, "xray_config.json")
@@ -116,6 +168,11 @@ class VpnServiceImpl : VpnService() {
 
             if (vpnInterface == null) {
                 throw IllegalStateException("Failed to establish VPN interface")
+            }
+            if (stopRequested.get()) {
+                vpnInterface?.close()
+                vpnInterface = null
+                return
             }
 
             // Start Xray process
@@ -174,26 +231,22 @@ class VpnServiceImpl : VpnService() {
     }
 
     private fun startXrayProcess(configPath: String) {
-        // TODO: When Xray-core AAR is added, use the native library instead of process
-        // For now, attempt to start xray binary
         xrayBinaryPath?.let { binaryPath ->
             try {
-                val pb = ProcessBuilder(binaryPath, "-config", configPath)
-                pb.redirectErrorStream(true)
-                xrayProcess = pb.start()
+                val pb = mutableListOf(binaryPath, "-config", configPath)
+                geoipPath?.let { pb.add("-geoip"); pb.add(it) }
+                geositePath?.let { pb.add("-geosite"); pb.add(it) }
+                ProcessBuilder(pb).apply { redirectErrorStream(true) }.start().also { xrayProcess = it }
 
-                // Monitor process output
                 scope.launch {
                     xrayProcess?.inputStream?.bufferedReader()?.use { reader ->
                         reader.forEachLine { line ->
-                            // Parse stats from Xray logs
                             parseStatsLine(line)
                         }
                     }
                 }
             } catch (e: Exception) {
-                // Xray binary not found or failed to start
-                // TODO: Use Xray-core native library
+                e.printStackTrace()
             }
         }
     }
@@ -301,6 +354,7 @@ class VpnServiceImpl : VpnService() {
     }
 
     private fun teardown() {
+        stopRequested.set(true)
         isRunning.set(false)
         xrayProcess?.destroy()
         xrayProcess = null

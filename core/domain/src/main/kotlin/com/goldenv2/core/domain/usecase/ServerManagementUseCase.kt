@@ -2,6 +2,7 @@ package com.goldenv2.core.domain.usecase
 
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.repository.ServerRepository
+import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +24,8 @@ class ServerManagementUseCase @Inject constructor(
     suspend fun deleteBySubscription(subscriptionId: String) = repository.deleteBySubscription(subscriptionId)
 
     suspend fun updateLatency(id: String, latency: Long) = repository.updateLatency(id, latency)
+
+    fun observeSelectedServer(): Flow<Server?> = repository.getSelected()
 
     suspend fun selectServer(id: String) {
         repository.clearSelection()

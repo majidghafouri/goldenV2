@@ -1,8 +1,7 @@
 pluginManagement {
     repositories {
         gradlePluginPortal()
-        maven { url = uri("http://127.0.0.1:8383") }
-        google()
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
         mavenCentral()
     }
     plugins {
@@ -20,8 +19,7 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven { url = uri("http://127.0.0.1:8383") }
-        google()
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
     }

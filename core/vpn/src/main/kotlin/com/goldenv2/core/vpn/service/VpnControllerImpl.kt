@@ -2,6 +2,7 @@ package com.goldenv2.core.vpn.service
 
 import android.content.Context
 import android.content.Intent
+import android.net.VpnService
 import androidx.core.content.ContextCompat
 import com.goldenv2.core.domain.model.ConnectionState
 import com.goldenv2.core.domain.model.Server
@@ -32,6 +33,8 @@ class VpnControllerImpl @Inject constructor(
 
     private val pendingServer = AtomicReference<Server?>(null)
 
+    override fun isVpnPermissionGranted(): Boolean = VpnService.prepare(context) == null
+
     override suspend fun start(server: Server) {
         pendingServer.set(server)
         _connectionState.update { it.copy(status = VpnStatus.Connecting, currentServer = server) }
@@ -42,7 +45,12 @@ class VpnControllerImpl @Inject constructor(
     }
 
     override suspend fun stop() {
-        context.stopService(Intent(context, VpnServiceImpl::class.java))
+        val stopIntent = Intent(context, VpnServiceImpl::class.java).apply { action = VpnServiceImpl.ACTION_STOP }
+        try {
+            context.startService(stopIntent)
+        } catch (e: IllegalStateException) {
+            context.stopService(stopIntent)
+        }
         _connectionState.update {
             it.copy(status = VpnStatus.Disconnected, currentServer = null, connectedAt = null)
         }

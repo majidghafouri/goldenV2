@@ -1,5 +1,7 @@
 package com.goldenv2.feature.home
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -63,8 +67,7 @@ fun HomeScreen(
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     onNavigateToServers: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToLogs: () -> Unit,
-    onRequestVpnPermission: () -> Unit
+    onNavigateToLogs: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -91,9 +94,7 @@ GoldenV2IconButton(
             connectionState = uiState.connectionState,
             selectedServer = uiState.selectedServer,
             onConnectClick = { viewModel.onConnectClick() },
-            onServerClick = { onNavigateToServers() },
-            vpnPermissionGranted = uiState.vpnPermissionGranted,
-            onPermissionClick = onRequestVpnPermission
+            onServerClick = { onNavigateToServers() }
         )
 
         // Live Stats Card
@@ -121,8 +122,6 @@ fun ConnectionStatusCard(
     selectedServer: com.goldenv2.core.domain.model.Server?,
     onConnectClick: () -> Unit,
     onServerClick: () -> Unit,
-    vpnPermissionGranted: Boolean,
-    onPermissionClick: () -> Unit,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
 ) {
     val isConnected = connectionState.isConnected
@@ -132,14 +131,20 @@ fun ConnectionStatusCard(
     val colorScheme = MaterialTheme.colorScheme
     val statusColor = getStatusColor(status)
 
+    val onCircleClick: () -> Unit = {
+        if (selectedServer == null && !isConnected) onServerClick() else onConnectClick()
+    }
+
     GoldenV2Card(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(
             modifier = androidx.compose.ui.Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Status indicator
             Box(
-                modifier = androidx.compose.ui.Modifier.size(120.dp),
+                modifier = androidx.compose.ui.Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onCircleClick),
                 contentAlignment = Alignment.Center
             ) {
                 // Background circle
@@ -207,21 +212,10 @@ fun ConnectionStatusCard(
 
             androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(top = 24.dp))
 
-            // Connect/Disconnect button
-            if (!vpnPermissionGranted && !isConnected) {
-                Button(
-                    onClick = onPermissionClick,
-                    modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(56.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Text(text = "Grant VPN Permission", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                }
-            } else {
-                Button(
-                    onClick = onConnectClick,
+            Button(
+                    onClick = {
+                        if (selectedServer == null && !isConnected) onServerClick() else onConnectClick()
+                    },
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(56.dp),
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                         containerColor = if (isConnected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
@@ -248,7 +242,6 @@ fun ConnectionStatusCard(
                         )
                     }
                 }
-            }
         }
     }
 }

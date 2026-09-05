@@ -57,6 +57,15 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
+    // Camera (QR scanning)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
+    implementation(libs.zxing.core)
+
+    // Permissions
+    implementation(libs.accompanist.permissions)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
