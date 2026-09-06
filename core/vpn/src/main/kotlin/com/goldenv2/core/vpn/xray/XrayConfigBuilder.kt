@@ -33,13 +33,12 @@ object XrayConfigBuilder {
         settings: AppSettings,
         routing: RoutingConfig,
         geoipPath: String = "",
-        geositePath: String = "",
-        localPort: Int = 10808
+        geositePath: String = ""
     ): String {
         val config = jsonMapOf(
             "log" to buildLogConfig(settings.logLevel),
             "dns" to buildDnsConfig(settings),
-            "inbounds" to buildInbounds(server, settings, localPort),
+            "inbounds" to buildInbounds(settings),
             "outbounds" to buildOutbounds(server),
             "routing" to buildRouting(routing, geoipPath, geositePath)
         )
@@ -91,50 +90,33 @@ object XrayConfigBuilder {
         )
     }
 
-    private fun buildInbounds(server: Server, settings: AppSettings, localPort: Int): List<JsonObject> {
+    private fun buildInbounds(settings: AppSettings): List<JsonObject> {
         val inbounds = mutableListOf<JsonObject>()
 
-        // SOCKS5 inbound
-        if (settings.allowLocalProxy) {
-            inbounds.add(jsonMapOf(
-                "port" to settings.localSocksPort,
-                "protocol" to "socks",
-                "listen" to "127.0.0.1",
-                "settings" to jsonMapOf(
-                    "udp" to true,
-                    "auth" to "noauth"
-                ),
-                "sniffing" to jsonMapOf(
-                    "enabled" to true,
-                    "destOverride" to listOf("http", "tls", "quic")
-                )
-            ))
-        }
+        // SOCKS5 inbound - always enabled: hev-socks5-tunnel reads packets from
+        // the TUN interface and forwards them into this inbound via SOCKS5 on
+        // 127.0.0.1:localSocksPort. Requires an fd to the local Xray process.
+        inbounds.add(jsonMapOf(
+            "port" to settings.localSocksPort,
+            "protocol" to "socks",
+            "listen" to "127.0.0.1",
+            "settings" to jsonMapOf(
+                "udp" to true,
+                "auth" to "noauth"
+            ),
+            "sniffing" to jsonMapOf(
+                "enabled" to true,
+                "destOverride" to listOf("http", "tls", "quic")
+            )
+        ))
 
-        // HTTP inbound
+        // HTTP inbound - local HTTP proxy, only when explicitly allowed
         if (settings.allowLocalProxy) {
             inbounds.add(jsonMapOf(
                 "port" to settings.localHttpPort,
                 "protocol" to "http",
                 "listen" to "127.0.0.1",
                 "settings" to jsonMapOf(),
-                "sniffing" to jsonMapOf(
-                    "enabled" to true,
-                    "destOverride" to listOf("http", "tls", "quic")
-                )
-            ))
-        }
-
-        // TUN inbound (for full VPN mode)
-        if (settings.vpnMode == com.goldenv2.core.domain.model.VpnMode.FullTunnel) {
-            inbounds.add(jsonMapOf(
-                "port" to localPort,
-                "protocol" to "dokodemo-door",
-                "listen" to "127.0.0.1",
-                "settings" to jsonMapOf(
-                    "network" to "tcp,udp",
-                    "followRedirect" to true
-                ),
                 "sniffing" to jsonMapOf(
                     "enabled" to true,
                     "destOverride" to listOf("http", "tls", "quic")
@@ -339,7 +321,9 @@ object XrayConfigBuilder {
             if (rule.ip.isNotEmpty()) pairs.add("ip" to rule.ip)
             if (rule.port != null) pairs.add("port" to rule.port!!)
             if (rule.sourcePort != null) pairs.add("sourcePort" to rule.sourcePort!!)
-            if (rule.network != "tcp,udp") pairs.add("network" to rule.network)
+            // Always emit network so a catch-all rule (no other matchers) stays a
+            // valid field rule; Xray rejects rules with no effective fields.
+            pairs.add("network" to rule.network)
             if (rule.source.isNotEmpty()) pairs.add("source" to rule.source)
             if (rule.user.isNotEmpty()) pairs.add("user" to rule.user)
             if (rule.inboundTag.isNotEmpty()) pairs.add("inboundTag" to rule.inboundTag)

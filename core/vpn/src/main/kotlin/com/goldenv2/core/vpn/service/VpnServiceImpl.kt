@@ -24,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,53 +62,50 @@ class VpnServiceImpl : VpnService() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        extractXrayAssets()
     }
 
-    private fun extractXrayAssets() {
-        val xrayFile = File(filesDir, "xray")
+    private suspend fun extractXrayAssets(): Boolean = withContext(Dispatchers.IO) {
+        // The Xray binary ships as a native lib (jniLibs/arm64-v8a/libxray.so)
+        // and is extracted to nativeLibraryDir by the package manager. It must
+        // be executed from there: on Android 10+ SELinux denies exec() on app
+        // data dirs (app_data_file), but allows it on apk_data_file
+        // (nativeLibraryDir).
+        val xrayFile = File(applicationInfo.nativeLibraryDir, "libxray.so")
         val geoipFile = File(filesDir, "geoip.dat")
         val geositeFile = File(filesDir, "geosite.dat")
 
-        if (!xrayFile.exists() || !geoipFile.exists() || !geositeFile.exists()) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    if (!xrayFile.exists()) {
-                        assets.open("xray").use { input ->
-                            FileOutputStream(xrayFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                        xrayFile.setExecutable(true)
-                    }
+        if (!xrayFile.exists()) {
+            android.util.Log.e(TAG, "Xray binary missing in nativeLibraryDir: ${xrayFile.absolutePath}")
+            return@withContext false
+        }
+        xrayBinaryPath = xrayFile.absolutePath
 
-                    if (!geoipFile.exists()) {
-                        assets.open("geoip.dat").use { input ->
-                            FileOutputStream(geoipFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
+        try {
+            // geoip/geosite load from filesDir via the XRAY_LOCATION_ASSET env
+            // var (set in startXrayProcess); Xray 26 resolves the databases
+            // relative to that directory, ignoring routing.geoip.path.
+            if (!geoipFile.exists()) {
+                assets.open("geoip.dat").use { input ->
+                    FileOutputStream(geoipFile).use { output ->
+                        input.copyTo(output)
                     }
-
-                    if (!geositeFile.exists()) {
-                        assets.open("geosite.dat").use { input ->
-                            FileOutputStream(geositeFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                    }
-
-                    xrayBinaryPath = xrayFile.absolutePath
-                    geoipPath = geoipFile.absolutePath
-                    geositePath = geositeFile.absolutePath
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
             }
-        } else {
-            xrayBinaryPath = xrayFile.absolutePath
+
+            if (!geositeFile.exists()) {
+                assets.open("geosite.dat").use { input ->
+                    FileOutputStream(geositeFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+
             geoipPath = geoipFile.absolutePath
             geositePath = geositeFile.absolutePath
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 
@@ -136,6 +134,11 @@ class VpnServiceImpl : VpnService() {
     private suspend fun establishTunnel() {
         val server = controller.consumePendingServer() ?: return
         if (isRunning.get()) return
+
+        if (!extractXrayAssets()) {
+            controller.updateState { it.copy(status = VpnStatus.Error, lastError = "Failed to extract Xray assets") }
+            return
+        }
 
         try {
             stopRequested.set(false)
@@ -178,6 +181,14 @@ class VpnServiceImpl : VpnService() {
             // Start Xray process
             startXrayProcess(configFile.absolutePath)
 
+            // Start the hev-socks5-tunnel datapath: reads packets from the TUN
+            // fd and forwards them to the local SOCKS5 inbound of the Xray process
+            val hevConfigFile = writeHevConfig(settings)
+            val fd = vpnInterface?.fd ?: throw IllegalStateException("VPN interface fd unavailable")
+            if (!HevTun2Socks.TProxyStartService(hevConfigFile.absolutePath, fd)) {
+                throw IllegalStateException("Failed to start tunnel datapath")
+            }
+
             isRunning.set(true)
             val connectedAt = java.time.Instant.now()
 
@@ -210,6 +221,23 @@ class VpnServiceImpl : VpnService() {
         return com.goldenv2.core.domain.model.RoutingConfig.default()
     }
 
+    private fun writeHevConfig(settings: com.goldenv2.core.domain.model.AppSettings): File {
+        val config = """
+            tunnel:
+              mtu: ${settings.mtu}
+              ipv4: '10.0.0.1'
+            socks5:
+              address: 127.0.0.1
+              port: ${settings.localSocksPort}
+              udp: 'udp'
+            misc:
+              log-level: 'info'
+        """.trimIndent()
+        return File(filesDir, "hev-socks5-tunnel.yml").apply {
+            writeText(config)
+        }
+    }
+
     private fun addExcludedRoutes(builder: Builder) {
         try {
             // Exclude local networks
@@ -231,22 +259,24 @@ class VpnServiceImpl : VpnService() {
     }
 
     private fun startXrayProcess(configPath: String) {
-        xrayBinaryPath?.let { binaryPath ->
-            try {
-                val pb = mutableListOf(binaryPath, "-config", configPath)
-                geoipPath?.let { pb.add("-geoip"); pb.add(it) }
-                geositePath?.let { pb.add("-geosite"); pb.add(it) }
-                ProcessBuilder(pb).apply { redirectErrorStream(true) }.start().also { xrayProcess = it }
+        val binaryPath = xrayBinaryPath
+            ?: throw IllegalStateException("Xray binary path not set")
 
-                scope.launch {
-                    xrayProcess?.inputStream?.bufferedReader()?.use { reader ->
-                        reader.forEachLine { line ->
-                            parseStatsLine(line)
-                        }
-                    }
+        // Xray 26 loads geoip.dat/geosite.dat from the XRAY_LOCATION_ASSET
+        // directory (there are no -geoip/-geosite CLI flags anymore).
+        val pb = mutableListOf(binaryPath, "-config", configPath)
+        xrayProcess = ProcessBuilder(pb)
+            .apply {
+                environment()["XRAY_LOCATION_ASSET"] = filesDir.absolutePath
+                redirectErrorStream(true)
+            }
+            .start()
+
+        scope.launch {
+            xrayProcess?.inputStream?.bufferedReader()?.use { reader ->
+                reader.forEachLine { line ->
+                    parseStatsLine(line)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
     }
@@ -264,27 +294,28 @@ class VpnServiceImpl : VpnService() {
 
             while (isRunning.get()) {
                 try {
-                    // TODO: Get actual stats from Xray API or TUN interface
-                    // For now, simulate
-                    val currentTime = System.currentTimeMillis()
-                    val elapsed = (currentTime - lastTime) / 1000.0
+                    val currTime = System.currentTimeMillis()
+                    val elapsed = (currTime - lastTime) / 1000.0
 
-                    // Simulate some traffic for UI testing
-                    val simulatedUpload = (Math.random() * 10000).toLong()
-                    val simulatedDownload = (Math.random() * 50000).toLong()
+                    val stats = HevTun2Socks.TProxyGetStats()
+                    val currUpload = stats?.getOrNull(1) ?: lastUpload
+                    val currDownload = stats?.getOrNull(3) ?: lastDownload
 
-                    lastUpload += simulatedUpload
-                    lastDownload += simulatedDownload
-                    lastTime = currentTime
+                    val uploadDelta = (currUpload - lastUpload).coerceAtLeast(0)
+                    val downloadDelta = (currDownload - lastDownload).coerceAtLeast(0)
 
                     controller.updateState {
                         it.copy(
-                            uploadSpeed = if (elapsed > 0) (simulatedUpload / elapsed).toLong() else 0,
-                            downloadSpeed = if (elapsed > 0) (simulatedDownload / elapsed).toLong() else 0,
-                            totalUpload = lastUpload,
-                            totalDownload = lastDownload
+                            uploadSpeed = if (elapsed > 0) (uploadDelta / elapsed).toLong() else 0,
+                            downloadSpeed = if (elapsed > 0) (downloadDelta / elapsed).toLong() else 0,
+                            totalUpload = currUpload,
+                            totalDownload = currDownload
                         )
                     }
+
+                    lastUpload = currUpload
+                    lastDownload = currDownload
+                    lastTime = currTime
 
                     updateNotification()
                     kotlinx.coroutines.delay(1000)
@@ -356,6 +387,14 @@ class VpnServiceImpl : VpnService() {
     private fun teardown() {
         stopRequested.set(true)
         isRunning.set(false)
+
+        // Stop hev-socks5-tunnel first: it is reading from the TUN fd, so it
+        // must release the fd before we close it underneath it
+        try {
+            HevTun2Socks.TProxyStopService()
+        } catch (e: Throwable) {
+        }
+
         xrayProcess?.destroy()
         xrayProcess = null
 
@@ -380,6 +419,8 @@ class VpnServiceImpl : VpnService() {
     companion object {
         const val ACTION_CONNECT = "com.goldenv2.core.vpn.action.CONNECT"
         const val ACTION_STOP = "com.goldenv2.core.vpn.action.STOP"
+
+        private const val TAG = "VpnServiceImpl"
 
         fun prepare(context: Context): Boolean {
             val intent = VpnService.prepare(context)
