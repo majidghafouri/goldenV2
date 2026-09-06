@@ -85,6 +85,13 @@ android {
         resources {
             excludes += listOf("META-INF/*.kotlin_module")
         }
+        // The Xray binary is shipped as a JNI lib (libxray.so). Legacy packaging
+        // extracts it to nativeLibraryDir on disk, which is required because the
+        // binary is executed as a process (exec() is denied on app data dirs by
+        // SELinux since Android 10, but allowed on apk_data_file).
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
