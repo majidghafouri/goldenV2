@@ -1,6 +1,6 @@
 # GoldenV2 - V2Ray/Xray Proxy Client for Android
 
-A native Android application replicating the core functionality of V2Box, built with modern Android development practices.
+A native Android V2Ray/Xray proxy client built with modern Android development practices.
 
 ## Features
 
@@ -64,30 +64,7 @@ GoldenV2/
 
 **⚠️ IMPORTANT**: The VPN functionality requires the Xray-core binary. This is NOT included in the repository.
 
-#### Option 1: AndroidLibXrayLite (Recommended)
-
-1. Add the AAR to `core/vpn/libs/`:
-   ```bash
-   mkdir -p core/vpn/libs
-   # Place xray-core.aar here
-   ```
-
-2. Update `core/vpn/build.gradle.kts`:
-   ```kotlin
-   dependencies {
-       implementation(files("libs/xray-core.aar"))
-       // ... other dependencies
-   }
-   ```
-
-3. Update `VpnServiceImpl.kt` to use the native library:
-   ```kotlin
-   // Replace process-based approach with native calls
-   // import com.github.xray.android.XrayCore
-   // XrayCore.start(configJson)
-   ```
-
-#### Option 2: Build Xray-core from Source
+#### Option 1: Build Xray-core from Source
 
 ```bash
 # Clone Xray-core
@@ -98,7 +75,7 @@ cd Xray-core
 go build -buildmode=c-shared -o libxray.so ./main
 ```
 
-#### Option 3: Use v2rayNG's Core Wrapper
+#### Option 2: Use v2rayNG's Core Wrapper
 
 v2rayNG provides a pre-built wrapper. See their [releases](https://github.com/2dust/v2rayNG/releases).
 
@@ -241,8 +218,6 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 - [Xray-core](https://github.com/XTLS/Xray-core) - The underlying proxy engine
 - [v2rayNG](https://github.com/2dust/v2rayNG) - Reference Android implementation
-- [AndroidLibXrayLite](https://github.com/XrayR-project/AndroidLibXrayLite) - Android Xray wrapper
-- [V2Box](https://github.com/V2Box/v2box) - UI/UX inspiration
 
 ## Disclaimer
 
