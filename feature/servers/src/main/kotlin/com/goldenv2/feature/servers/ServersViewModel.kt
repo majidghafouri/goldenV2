@@ -2,11 +2,13 @@ package com.goldenv2.feature.servers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.goldenv2.core.domain.model.Protocol
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.Subscription
 import com.goldenv2.core.domain.usecase.GetServersUseCase
 import com.goldenv2.core.domain.usecase.LogUseCase
 import com.goldenv2.core.domain.usecase.ServerManagementUseCase
+import com.goldenv2.core.domain.usecase.SettingsUseCase
 import com.goldenv2.core.domain.usecase.SubscriptionUseCase
 import com.goldenv2.core.network.SubscriptionFetcher
 import com.goldenv2.core.network.parser.parseSubscriptionContent
@@ -26,6 +28,7 @@ class ServersViewModel @Inject constructor(
     private val getServersUseCase: GetServersUseCase,
     private val serverManagementUseCase: ServerManagementUseCase,
     private val subscriptionUseCase: SubscriptionUseCase,
+    private val settingsUseCase: SettingsUseCase,
     private val subscriptionFetcher: SubscriptionFetcher,
     private val logUseCase: LogUseCase
 ) : ViewModel() {
@@ -36,8 +39,30 @@ class ServersViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    private val TAG = "ServersViewModel"
+
     init {
         observeData()
+        viewModelScope.launch {
+            val count = serverManagementUseCase.count()
+            if (count == 0) {
+                logUseCase.i("ServersViewModel", "Database empty, adding test SSH server")
+                val testServer = Server(
+                    id = "test-ssh-1",
+                    subscriptionId = "",
+                    name = "Test SSH (example.com)",
+                    protocol = Protocol.Ssh,
+                    address = "example.com",
+                    port = 22,
+                    uuid = "testuser",
+                    password = "testpass"
+                )
+                serverManagementUseCase.addServer(testServer)
+                serverManagementUseCase.selectServer(testServer.id)
+                settingsUseCase.saveLastSelectedServerId(testServer.id)
+                logUseCase.i("ServersViewModel", "Test SSH server added and selected")
+            }
+        }
     }
 
     private fun observeData() {
@@ -59,6 +84,7 @@ class ServersViewModel @Inject constructor(
 
                 Triple(filteredServers, subscriptions, grouped)
             }.distinctUntilChanged().collect { (servers, subscriptions, grouped) ->
+                logUseCase.d("ServersViewModel", "Loaded ${servers.size} servers: ${servers.joinToString { it.name }}")
                 _uiState.update { state ->
                     state.copy(
                         subscriptions = subscriptions,
@@ -89,6 +115,23 @@ class ServersViewModel @Inject constructor(
 
     fun onDismissManualEntry() {
         _uiState.update { it.copy(showManualEntry = false) }
+    }
+
+    fun onOpenDetailedEntry() {
+        _uiState.update { it.copy(showAddServerSheet = false, showDetailedEntrySheet = true) }
+    }
+
+    fun onDismissDetailedEntry() {
+        _uiState.update { it.copy(showDetailedEntrySheet = false) }
+    }
+
+    fun onAddServerDetails(server: Server) {
+        viewModelScope.launch {
+            serverManagementUseCase.addServer(server)
+            logUseCase.i("ServersViewModel", "Added server manually: ${server.name}")
+            setImportResult("Added server: ${server.name}", isError = false)
+            onDismissDetailedEntry()
+        }
     }
 
     fun onOpenQrScanner() {
@@ -205,6 +248,30 @@ class ServersViewModel @Inject constructor(
         }
     }
 
+    fun onPingAll() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            logUseCase.i("ServersViewModel", "Pinging all servers")
+
+            val allServers = getServersUseCase().first()
+            val localServers = allServers.filter { it.subscriptionId.isBlank() }
+            val subscriptionServers = allServers.filter { it.subscriptionId.isNotBlank() }
+
+            // Ping local servers
+            localServers.forEach { server ->
+                onTestLatency(server)
+            }
+
+            // Ping subscription servers
+            subscriptionServers.forEach { server ->
+                onTestLatency(server)
+            }
+
+            _uiState.update { it.copy(isLoading = false) }
+            logUseCase.i("ServersViewModel", "Pinged ${allServers.size} servers")
+        }
+    }
+
     fun onDeleteSubscription(subscription: Subscription) {
         viewModelScope.launch {
             serverManagementUseCase.deleteBySubscription(subscription.id)
@@ -222,6 +289,7 @@ class ServersViewModel @Inject constructor(
     fun onSelectServer(server: Server) {
         viewModelScope.launch {
             serverManagementUseCase.selectServer(server.id)
+            settingsUseCase.saveLastSelectedServerId(server.id)
         }
     }
 
@@ -246,6 +314,31 @@ class ServersViewModel @Inject constructor(
             serverManagementUseCase.updateLatency(server.id, latency)
         }
     }
+
+    fun onShowContextMenu(server: Server) {
+        _uiState.update { it.copy(showServerContextMenu = true, contextMenuServer = server) }
+    }
+
+    fun onDismissContextMenu() {
+        _uiState.update { it.copy(showServerContextMenu = false, contextMenuServer = null) }
+    }
+
+    fun onEditServer(server: Server) {
+        onDismissContextMenu()
+        _uiState.update { it.copy(showEditServerSheet = true, editServer = server) }
+    }
+
+    fun onDismissEditServerSheet() {
+        _uiState.update { it.copy(showEditServerSheet = false, editServer = null) }
+    }
+
+    fun onUpdateServer(server: Server) {
+        viewModelScope.launch {
+            serverManagementUseCase.updateServer(server)
+            logUseCase.i("ServersViewModel", "Updated server: ${server.name}")
+            onDismissEditServerSheet()
+        }
+    }
 }
 
 data class ServersUiState(
@@ -256,8 +349,13 @@ data class ServersUiState(
     val isLoading: Boolean = false,
     val showAddServerSheet: Boolean = false,
     val showManualEntry: Boolean = false,
+    val showDetailedEntrySheet: Boolean = false,
     val showQrScanner: Boolean = false,
     val showAddSubscriptionDialog: Boolean = false,
     val importMessage: String? = null,
-    val isImportError: Boolean = false
+    val isImportError: Boolean = false,
+    val showServerContextMenu: Boolean = false,
+    val contextMenuServer: Server? = null,
+    val showEditServerSheet: Boolean = false,
+    val editServer: Server? = null
 )

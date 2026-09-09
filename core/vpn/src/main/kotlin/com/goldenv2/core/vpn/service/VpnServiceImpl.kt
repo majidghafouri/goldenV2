@@ -13,26 +13,32 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import com.goldenv2.core.domain.model.ConnectionState
+import com.goldenv2.core.domain.model.Protocol
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.VpnStatus
 import com.goldenv2.core.vpn.R
 import com.goldenv2.core.vpn.xray.XrayConfigBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
 interface VpnController {
     val connectionState: StateFlow<ConnectionState>
     fun isVpnPermissionGranted(): Boolean
+    fun requestVpnPermission(): Intent?
     suspend fun start(server: Server)
     suspend fun stop()
     suspend fun reconnect()
@@ -46,9 +52,36 @@ class VpnServiceImpl : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var xrayProcess: Process? = null
+    private var sshTunnel: SshTunnel? = null
     private val isRunning = AtomicBoolean(false)
     private val stopRequested = AtomicBoolean(false)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /**
+     * Serializes all native tunnel lifecycle operations (start/stop/stats-read).
+     * Prevents the disconnect crash caused by concurrent native calls into
+     * hev-socks5-tunnel (stop racing a stats read) and by closing the TUN fd
+     * while the tunnel's native reader threads are still using it.
+     */
+    private val tunnelMutex = Mutex()
+
+    /** True while a teardown is in progress or a teardown job is pending. */
+    private val teardownInProgress = AtomicBoolean(false)
+
+    /**
+     * Dedicated scope for teardown work: it must survive the cancellation of
+     * [scope] (which happens in [onDestroy]) or the native cleanup would be
+     * cancelled mid-flight and leak the tunnel/fd.
+     */
+    private val teardownScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /**
+     * Completes when the currently-running teardown finishes; a connect arriving
+     * while teardown is in flight awaits this instead of silently early-returning.
+     */
+    private val teardownSignal = AtomicReference(
+        CompletableDeferred<Unit>().apply { complete(Unit) }
+    )
 
     // Notification
     private val NOTIFICATION_ID = 1001
@@ -133,81 +166,123 @@ class VpnServiceImpl : VpnService() {
 
     private suspend fun establishTunnel() {
         val server = controller.consumePendingServer() ?: return
-        if (isRunning.get()) return
 
-        if (!extractXrayAssets()) {
-            controller.updateState { it.copy(status = VpnStatus.Error, lastError = "Failed to extract Xray assets") }
+        while (teardownInProgress.get()) teardownSignal.get().await()
+
+        // Check VPN preparation before attempting to create tunnel
+        val prepareIntent = VpnService.prepare(this)
+        if (prepareIntent != null) {
+            controller.updateState { it.copy(
+                status = VpnStatus.Error,
+                lastError = "VPN permission not granted. Please grant VPN permission in system settings."
+            ) }
             return
         }
 
-        try {
-            stopRequested.set(false)
-            val settings = getSettings()
-            val config = XrayConfigBuilder.buildConfig(
-                server,
-                settings,
-                getRoutingConfig(),
-                geoipPath ?: "",
-                geositePath ?: ""
-            )
+        tunnelMutex.withLock {
+            if (isRunning.get() || teardownInProgress.get()) return
 
-            // Write config to file
-            val configFile = File(filesDir, "xray_config.json")
-            FileOutputStream(configFile).use { it.write(config.toByteArray()) }
-
-            // Start VPN interface
-            val builder = Builder()
-                .setSession("GoldenV2 VPN")
-                .addAddress("10.0.0.1", 24)
-                .addRoute("0.0.0.0", 0)
-                .addDnsServer("1.1.1.1")
-                .addDnsServer("8.8.8.8")
-                .setMtu(1500)
-
-            // Exclude local networks
-            addExcludedRoutes(builder)
-
-            vpnInterface = builder.establish()
-
-            if (vpnInterface == null) {
-                throw IllegalStateException("Failed to establish VPN interface")
-            }
-            if (stopRequested.get()) {
-                vpnInterface?.close()
-                vpnInterface = null
+            if (!extractXrayAssets()) {
+                controller.updateState { it.copy(status = VpnStatus.Error, lastError = "Failed to extract Xray assets") }
                 return
             }
 
-            // Start Xray process
-            startXrayProcess(configFile.absolutePath)
-
-            // Start the hev-socks5-tunnel datapath: reads packets from the TUN
-            // fd and forwards them to the local SOCKS5 inbound of the Xray process
-            val hevConfigFile = writeHevConfig(settings)
-            val fd = vpnInterface?.fd ?: throw IllegalStateException("VPN interface fd unavailable")
-            if (!HevTun2Socks.TProxyStartService(hevConfigFile.absolutePath, fd)) {
-                throw IllegalStateException("Failed to start tunnel datapath")
-            }
-
-            isRunning.set(true)
-            val connectedAt = java.time.Instant.now()
-
-            controller.updateState {
-                it.copy(
-                    status = VpnStatus.Connected,
-                    currentServer = server,
-                    connectedAt = connectedAt,
-                    totalUpload = 0,
-                    totalDownload = 0
+            try {
+                stopRequested.set(false)
+                val settings = getSettings()
+                val config = XrayConfigBuilder.buildConfig(
+                    server,
+                    settings,
+                    getRoutingConfig(),
+                    geoipPath ?: "",
+                    geositePath ?: ""
                 )
+
+                // Write config to file
+                val configFile = File(filesDir, "xray_config.json")
+                FileOutputStream(configFile).use { it.write(config.toByteArray()) }
+
+                // Start VPN interface
+                val builder = Builder()
+                    .setSession("GoldenV2 VPN")
+                    .addAddress("10.0.0.1", 24)
+                    .addRoute("0.0.0.0", 0)
+                    .addDnsServer("1.1.1.1")
+                    .addDnsServer("8.8.8.8")
+                    .setMtu(1500)
+
+                // Exclude local networks
+                addExcludedRoutes(builder)
+
+                vpnInterface = builder.establish()
+
+                if (vpnInterface == null) {
+                    throw IllegalStateException("Failed to establish VPN interface")
+                }
+                if (stopRequested.get()) {
+                    vpnInterface?.close()
+                    vpnInterface = null
+                    return
+                }
+
+                // SSH protocol needs a live local tunnel before Xray can route through it
+                if (server.protocol == Protocol.Ssh) {
+                    val tunnel = SshTunnel(server, this)
+                    val err = tunnel.start()
+                    if (err != null) {
+                        controller.updateState { it.copy(status = VpnStatus.Error, lastError = "SSH tunnel: $err") }
+                        vpnInterface?.close()
+                        vpnInterface = null
+                        return
+                    }
+                    sshTunnel = tunnel
+                }
+
+                // Start Xray process
+                startXrayProcess(configFile.absolutePath)
+
+                // If a disconnect arrived while starting Xray, stop before the
+                // native tunnel starts reading the fd.
+                if (stopRequested.get()) {
+                    xrayProcess?.destroy()
+                    xrayProcess = null
+                    sshTunnel?.stop()
+                    sshTunnel = null
+                    vpnInterface?.close()
+                    vpnInterface = null
+                    return
+                }
+
+                // Start the hev-socks5-tunnel datapath: reads packets from the TUN
+                // fd and forwards them to the local SOCKS5 inbound of the Xray process
+                val hevConfigFile = writeHevConfig(settings)
+                val fd = vpnInterface?.fd ?: throw IllegalStateException("VPN interface fd unavailable")
+                if (!HevTun2Socks.TProxyStartService(hevConfigFile.absolutePath, fd)) {
+                    throw IllegalStateException("Failed to start tunnel datapath")
+                }
+
+                isRunning.set(true)
+                val connectedAt = java.time.Instant.now()
+
+                controller.updateState {
+                    it.copy(
+                        status = VpnStatus.Connected,
+                        currentServer = server,
+                        connectedAt = connectedAt,
+                        totalUpload = 0,
+                        totalDownload = 0
+                    )
+                }
+
+            } catch (e: Exception) {
+                controller.updateState { it.copy(status = VpnStatus.Error, lastError = e.message) }
+                teardown()
             }
+        }
 
-            // Start stats monitoring
+        // Stats monitoring runs OUTSIDE the tunnel mutex so it never blocks teardown.
+        if (isRunning.get()) {
             startStatsMonitoring()
-
-        } catch (e: Exception) {
-            controller.updateState { it.copy(status = VpnStatus.Error, lastError = e.message) }
-            teardown()
         }
     }
 
@@ -273,10 +348,19 @@ class VpnServiceImpl : VpnService() {
             .start()
 
         scope.launch {
-            xrayProcess?.inputStream?.bufferedReader()?.use { reader ->
-                reader.forEachLine { line ->
-                    parseStatsLine(line)
+            try {
+                xrayProcess?.inputStream?.bufferedReader()?.use { reader ->
+                    reader.forEachLine { line ->
+                        parseStatsLine(line)
+                    }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Stream closes when teardown() destroys the Xray process while
+                // this reader is blocked; an unhandled coroutine exception here
+                // would crash the app (FATAL EXCEPTION on Android).
+                android.util.Log.d(TAG, "Xray output stream closed: ${e.message}")
             }
         }
     }
@@ -297,7 +381,10 @@ class VpnServiceImpl : VpnService() {
                     val currTime = System.currentTimeMillis()
                     val elapsed = (currTime - lastTime) / 1000.0
 
-                    val stats = HevTun2Socks.TProxyGetStats()
+                    val stats = tunnelMutex.withLock {
+                        if (!isRunning.get() || teardownInProgress.get()) null
+                        else HevTun2Socks.TProxyGetStats()
+                    }
                     val currUpload = stats?.getOrNull(1) ?: lastUpload
                     val currDownload = stats?.getOrNull(3) ?: lastDownload
 
@@ -319,6 +406,8 @@ class VpnServiceImpl : VpnService() {
 
                     updateNotification()
                     kotlinx.coroutines.delay(1000)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     break
                 }
@@ -385,34 +474,54 @@ class VpnServiceImpl : VpnService() {
     }
 
     private fun teardown() {
+        // Idempotent: a disconnect racing connect/catch/onDestroy must only
+        // run the native cleanup once.
+        if (!teardownInProgress.compareAndSet(false, true)) {
+            return
+        }
+
         stopRequested.set(true)
         isRunning.set(false)
 
-        // Stop hev-socks5-tunnel first: it is reading from the TUN fd, so it
-        // must release the fd before we close it underneath it
-        try {
-            HevTun2Socks.TProxyStopService()
-        } catch (e: Throwable) {
+        val signal = CompletableDeferred<Unit>()
+        teardownSignal.set(signal)
+
+        teardownScope.launch {
+            tunnelMutex.withLock {
+                try {
+                    // Stop hev-socks5-tunnel first: it owns the native threads
+                    // reading the TUN fd, so it must release the fd before we
+                    // close it underneath them.
+                    runCatching { HevTun2Socks.TProxyStopService() }
+
+                    xrayProcess?.destroy()
+                    xrayProcess = null
+
+                    sshTunnel?.stop()
+                    sshTunnel = null
+
+                    runCatching { vpnInterface?.close() }
+                    vpnInterface = null
+                } finally {
+                    teardownInProgress.set(false)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                runCatching {
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.cancel(NOTIFICATION_ID)
+                    stopForeground(true)
+                }
+            }
+            signal.complete(Unit)
         }
-
-        xrayProcess?.destroy()
-        xrayProcess = null
-
-        try {
-            vpnInterface?.close()
-        } catch (e: Exception) {
-            // Ignore
-        }
-        vpnInterface = null
-
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.cancel(NOTIFICATION_ID)
-        stopForeground(true)
     }
 
     override fun onDestroy() {
-        scope.coroutineContext.cancelChildren()
+        // teardown() runs on its own scope; cancelling [scope] first would
+        // kill the native cleanup job before it releases the tunnel/fd.
         teardown()
+        scope.coroutineContext.cancelChildren()
         super.onDestroy()
     }
 

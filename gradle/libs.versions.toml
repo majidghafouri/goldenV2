@@ -29,6 +29,7 @@ turbine = "1.0.0"
 coil = "2.6.0"
 accompanist = "0.32.0"
 ktx = "1.12.0"
+apacheSshd = "2.10.0"
 
 [libraries]
 # AndroidX
@@ -104,6 +105,9 @@ material = { group = "com.google.android.material", name = "material", version.r
 # Accompanist (Permissions, System UI Controller)
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 accompanist-systemuicontroller = { group = "com.google.accompanist", name = "accompanist-systemuicontroller", version.ref = "accompanist" }
+
+# SSH client (MINA SSHD) - dynamic port forwarding (SOCKS) for SSH servers
+sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "apacheSshd" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

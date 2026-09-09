@@ -35,6 +35,8 @@ class VpnControllerImpl @Inject constructor(
 
     override fun isVpnPermissionGranted(): Boolean = VpnService.prepare(context) == null
 
+    override fun requestVpnPermission(): Intent? = VpnService.prepare(context)
+
     override suspend fun start(server: Server) {
         pendingServer.set(server)
         _connectionState.update { it.copy(status = VpnStatus.Connecting, currentServer = server) }
@@ -45,12 +47,12 @@ class VpnControllerImpl @Inject constructor(
     }
 
     override suspend fun stop() {
+        // Dispatch ACTION_STOP to the service: stopService() cannot destroy a
+        // bound VpnService (the system holds a binding while the tunnel is up),
+        // so the teardown would never run and a later connect would silently
+        // early-return (isRunning still true).
         val stopIntent = Intent(context, VpnServiceImpl::class.java).apply { action = VpnServiceImpl.ACTION_STOP }
-        try {
-            context.startService(stopIntent)
-        } catch (e: IllegalStateException) {
-            context.stopService(stopIntent)
-        }
+        ContextCompat.startForegroundService(context, stopIntent)
         _connectionState.update {
             it.copy(status = VpnStatus.Disconnected, currentServer = null, connectedAt = null)
         }

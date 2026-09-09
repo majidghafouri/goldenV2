@@ -39,7 +39,7 @@ class ServerRepositoryImpl @Inject constructor(
 
     override suspend fun clearSelection() = dao.clearSelection()
 
-    override suspend fun selectServer(id: String) = dao.selectServer(id)
+    override suspend fun selectServer(id: String) = dao.selectServerInTransaction(id)
 
     override suspend fun count(): Int = dao.count()
 }

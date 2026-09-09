@@ -32,6 +32,9 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
+    // SSH client - dynamic SOCKS tunnel for SSH protocol servers
+    implementation(libs.sshd.core)
+
     // Serialization
     implementation(libs.kotlinx.serialization.json)
 

@@ -45,11 +45,19 @@ interface ServerDao {
     @Query("UPDATE servers SET latency = :latency WHERE id = :id")
     suspend fun updateLatency(id: String, latency: Long)
 
+    @Transaction
     @Query("UPDATE servers SET isSelected = 0")
     suspend fun clearSelection()
 
+    @Transaction
     @Query("UPDATE servers SET isSelected = 1 WHERE id = :id")
     suspend fun selectServer(id: String)
+
+    @Transaction
+    suspend fun selectServerInTransaction(id: String) {
+        clearSelection()
+        selectServer(id)
+    }
 
     @Query("SELECT COUNT(*) FROM servers")
     suspend fun count(): Int

@@ -3,6 +3,7 @@ package com.goldenv2.core.domain.usecase
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.repository.ServerRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,9 +28,16 @@ class ServerManagementUseCase @Inject constructor(
 
     fun observeSelectedServer(): Flow<Server?> = repository.getSelected()
 
+    fun getById(id: String): Flow<Server?> = repository.getById(id)
+
     suspend fun selectServer(id: String) {
         repository.clearSelection()
         repository.selectServer(id)
+    }
+
+    suspend fun selectServerAndGet(id: String): Server? {
+        selectServer(id)
+        return repository.getById(id).first()
     }
 
     suspend fun duplicateServer(server: Server): Server {
@@ -41,4 +49,6 @@ class ServerManagementUseCase @Inject constructor(
         repository.insert(newServer)
         return newServer
     }
+
+    suspend fun count(): Int = repository.count()
 }

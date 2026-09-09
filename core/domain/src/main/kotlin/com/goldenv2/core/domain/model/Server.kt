@@ -50,7 +50,7 @@ data class Server(
 
 @Serializable
 enum class Protocol {
-    VMess, VLESS, Trojan, Shadowsocks, Hysteria2, Hysteria, Tuic, WireGuard
+    VMess, VLESS, Trojan, Shadowsocks, Hysteria2, Hysteria, Tuic, WireGuard, Ssh
 }
 
 @Serializable

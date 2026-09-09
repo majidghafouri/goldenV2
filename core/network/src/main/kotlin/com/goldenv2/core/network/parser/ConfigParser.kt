@@ -393,6 +393,60 @@ class Hysteria2Parser : BaseParser() {
     }
 }
 
+class SshParser : BaseParser() {
+    override fun getSupportedSchemes() = listOf("ssh")
+
+    override fun parse(uri: String): ParseResult {
+        return try {
+            val withoutScheme = uri.removePrefix("ssh://")
+            val hashIndex = withoutScheme.indexOf('#')
+            val mainPart = if (hashIndex != -1) withoutScheme.substring(0, hashIndex) else withoutScheme
+            val name = if (hashIndex != -1) URLDecoder.decode(withoutScheme.substring(hashIndex + 1), StandardCharsets.UTF_8.name()) else "SSH Server"
+
+            val atIndex = mainPart.indexOf('@')
+            if (atIndex == -1) return ParseResult.Failure("Invalid SSH format: missing @")
+
+            val userInfo = mainPart.substring(0, atIndex)
+            val hostPortQuery = mainPart.substring(atIndex + 1)
+
+            val queryStart = hostPortQuery.indexOf('?')
+            val hostPort = if (queryStart != -1) hostPortQuery.substring(0, queryStart) else hostPortQuery
+            val query = if (queryStart != -1) hostPortQuery.substring(queryStart) else ""
+
+            val (address, port) = extractHostPort(hostPort)
+            val params = parseQueryParams("?" + query)
+
+            val (username, password) = if (userInfo.contains(":")) {
+                val parts = userInfo.split(":", limit = 2)
+                parts[0] to parts[1]
+            } else {
+                userInfo to ""
+            }
+
+            val id = generateId()
+            val keyFile = params["keyfile"]
+            val keyPassphrase = params["keypass"]
+
+            val server = Server(
+                id = id,
+                subscriptionId = "",
+                name = name,
+                protocol = Protocol.Ssh,
+                address = address,
+                port = port,
+                uuid = username,
+                password = password,
+                path = keyFile,
+                host = keyPassphrase,
+                group = parseFragment(uri)
+            )
+            ParseResult.Success(server)
+        } catch (e: Exception) {
+            ParseResult.Failure("Failed to parse SSH: ${e.message}")
+        }
+    }
+}
+
 object ConfigParserRegistry {
     private val parsers: Map<String, ConfigParser> = mapOf(
         "vmess" to VmParser(),
@@ -400,7 +454,8 @@ object ConfigParserRegistry {
         "trojan" to TrojanParser(),
         "ss" to ShadowsocksParser(),
         "hysteria2" to Hysteria2Parser(),
-        "hy2" to Hysteria2Parser()
+        "hy2" to Hysteria2Parser(),
+        "ssh" to SshParser()
     )
 
     fun parse(uri: String): ParseResult {

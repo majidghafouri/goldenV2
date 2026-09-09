@@ -83,7 +83,7 @@ android {
 
     packaging {
         resources {
-            excludes += listOf("META-INF/*.kotlin_module")
+            excludes += listOf("META-INF/*.kotlin_module", "META-INF/DEPENDENCIES")
         }
         // The Xray binary is shipped as a JNI lib (libxray.so). Legacy packaging
         // extracts it to nativeLibraryDir on disk, which is required because the

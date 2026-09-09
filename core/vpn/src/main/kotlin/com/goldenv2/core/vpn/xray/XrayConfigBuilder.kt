@@ -5,6 +5,7 @@ import com.goldenv2.core.domain.model.NetworkType
 import com.goldenv2.core.domain.model.Protocol
 import com.goldenv2.core.domain.model.RoutingConfig
 import com.goldenv2.core.domain.model.Server
+import com.goldenv2.core.vpn.service.SshTunnel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -155,6 +156,7 @@ object XrayConfigBuilder {
             Protocol.Trojan -> buildTrojanOutbound(server)
             Protocol.Shadowsocks -> buildShadowsocksOutbound(server)
             Protocol.Hysteria2 -> buildHysteria2Outbound(server)
+            Protocol.Ssh -> buildSshOutbound()
             else -> buildVmessOutbound(server) // fallback
         }
     }
@@ -265,6 +267,19 @@ object XrayConfigBuilder {
                 ))
             ),
             "streamSettings" to streamSettings
+        )
+    }
+
+    private fun buildSshOutbound(): JsonObject {
+        return jsonMapOf(
+            "protocol" to "socks",
+            "tag" to "proxy",
+            "settings" to jsonMapOf(
+                "servers" to listOf(jsonMapOf(
+                    "address" to "127.0.0.1",
+                    "port" to SshTunnel.LOCAL_SOCKS_PORT
+                ))
+            )
         )
     }
 

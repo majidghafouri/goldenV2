@@ -42,10 +42,12 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VpnLock
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -69,7 +71,19 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToLogs: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    // Handle VPN permission request from ViewModel
+    LaunchedEffect(viewModel.vpnPermissionRequest) {
+        viewModel.vpnPermissionRequest.collect { intent ->
+            intent?.let {
+                context.startActivity(it)
+                // Reset to avoid re-launching on recomposition
+                viewModel.onVpnPermissionHandled()
+            }
+        }
+    }
 
     Column(
         modifier = modifier
