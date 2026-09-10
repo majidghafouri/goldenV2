@@ -274,7 +274,8 @@ class VpnServiceImpl : VpnService() {
                     )
                 }
 
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                android.util.Log.e(TAG, "establishTunnel failed", e)
                 controller.updateState { it.copy(status = VpnStatus.Error, lastError = e.message) }
                 teardown()
             }

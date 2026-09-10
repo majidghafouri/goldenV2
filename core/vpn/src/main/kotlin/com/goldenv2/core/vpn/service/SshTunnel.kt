@@ -10,6 +10,7 @@ import org.apache.sshd.client.keyverifier.AcceptAllServerKeyVerifier
 import org.apache.sshd.client.session.ClientSession
 import org.apache.sshd.common.NamedResource
 import org.apache.sshd.common.config.keys.FilePasswordProvider
+import org.apache.sshd.common.util.OsUtils
 import org.apache.sshd.common.util.net.SshdSocketAddress
 import org.apache.sshd.common.util.security.SecurityUtils
 import java.io.File
@@ -53,13 +54,33 @@ class SshTunnel(
 
         Log.d(TAG, "Starting SSH tunnel to ${server.address}:${server.port} as $username")
 
-        // Set user.home to app's files directory to avoid "No user home" error
-        // This must be done BEFORE SshClient.setUpDefaultClient() is called
+        // Set user.home to app's files directory to avoid "No user home" error.
+        // This must be done BEFORE SshClient.setUpDefaultClient() is called.
         val homeDir = context.filesDir.absolutePath
         System.setProperty("user.home", homeDir)
 
-        // Use setUpDefaultClient() for proper configuration
-        val sshClient = SshClient.setUpDefaultClient()
+        // Also create ~/.ssh directory so MINA SSHD's homeDir resolution succeeds
+        try {
+            val sshDir = File(homeDir, ".ssh")
+            if (!sshDir.exists()) sshDir.mkdirs()
+        } catch (_: Exception) { /* best effort */ }
+
+        // Force SSHD into Android mode. Its auto-detection can fail on some
+        // devices, which makes it enter the javax.management unwrap branch in
+        // ExceptionUtils.peelException(). Those classes are absent on Android
+        // and the branch crashes the app even though we ship stub definitions.
+        OsUtils.setAndroid(true)
+
+        // Use setUpDefaultClient() for proper configuration.
+        // Wrap in try/catch Throwable because on Android, SshClient.setUpDefaultClient()
+        // can throw ExceptionInInitializerError (an Error, not Exception) when static
+        // initializers fail due to missing user.home or unsupported NIO2 providers.
+        val sshClient = try {
+            SshClient.setUpDefaultClient()
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to create SSH client (setUpDefaultClient)", e)
+            return "Failed to initialize SSH client: ${e.message}"
+        }
         sshClient.serverKeyVerifier = AcceptAllServerKeyVerifier.INSTANCE
 
         try {
@@ -67,6 +88,7 @@ class SshTunnel(
             Log.d(TAG, "SSH client started")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start SSH client", e)
+            sshClient.stop()
             return "Failed to start SSH client: ${e.message}"
         }
 
