@@ -18,6 +18,14 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+// AppMetrica API key (local.properties is gitignored). Test key from AppMetrica docs used as fallback.
+val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties().apply {
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
+
 android {
     namespace = "com.goldenv2.app"
     compileSdk = 35
@@ -31,6 +39,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        buildConfigField(
+            "String",
+            "APPMETRICA_API_KEY",
+            "\"${localProperties.getProperty("APPMETRICA_API_KEY", "test")}\""
+        )
     }
 
     signingConfigs {
@@ -79,6 +93,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -135,6 +150,14 @@ dependencies {
 
     // Material Design (for XML themes)
     implementation(libs.material)
+
+    // AppMetrica (users, retention, crashes, ad revenue)
+    implementation(libs.appmetrica)
+
+    // AppMetrica Push (pushes sent/delivered) — requires Firebase project,
+    // see README. Safe no-op if Firebase is not configured.
+    implementation(libs.appmetrica.push)
+    implementation(libs.firebase.messaging)
 
     // Testing
     testImplementation(libs.junit)

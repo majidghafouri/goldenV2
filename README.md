@@ -202,6 +202,45 @@ Stored in `SettingsDataStore` with keys:
 ./gradlew :core:domain:test
 ```
 
+## Ads & Analytics (Yandex)
+
+The app integrates Yandex Mobile Ads (banner on Home, interstitial before each
+connect) and AppMetrica (users, retention, crashes, ad revenue). Ad unit IDs
+and API keys are read from `local.properties` (gitignored) at build time:
+
+```properties
+# local.properties
+YANDEX_BANNER_AD_UNIT_ID=R-M-XXXXXXX_Y
+YANDEX_INTERSTITIAL_AD_UNIT_ID=R-M-XXXXXXX_I
+APPMETRICA_API_KEY=<your AppMetrica API key>
+```
+
+Without these keys, debug builds fall back to the public Yandex demo ad unit
+IDs, so the repo stays buildable out of the box.
+
+### User Consent & Privacy
+
+On first launch the app shows a data-processing consent dialog (required for
+EEA users). The answer is persisted in SharedPreferences and wired to both SDKs:
+
+- **Yandex Mobile Ads**: `YandexAds.setUserConsent()` — granted = personalized
+  ads, declined = non-personalized/contextual ads (ads still serve either way)
+- **AppMetrica**: `setDataSendingEnabled()` — data is **not sent at all** until
+  the user accepts. A fresh install starts in a fully opt-out state.
+
+The `com.google.android.gms.permission.AD_ID` permission (declared in the app
+manifest) lets the ad SDK access the advertising ID on Android 13+.
+
+### Push Notifications (optional)
+
+AppMetrica Push requires a Firebase project:
+
+1. Create a Firebase project and add `google-services.json` to the `app/` module
+2. Apply the `com.google.gms.google-services` Gradle plugin
+3. AppMetrica Push activation is already wired in `GoldenV2Application`
+
+Without Firebase, `AppMetricaPush.activate()` is a safe no-op.
+
 ## Contributing
 
 1. Fork the repository

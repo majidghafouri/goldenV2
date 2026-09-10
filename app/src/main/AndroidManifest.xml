@@ -17,6 +17,8 @@
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
+    <!-- Required by ad SDKs to access the advertising ID on Android 13+ -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <application
         android:name=".GoldenV2Application"
@@ -29,6 +31,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.GoldenV2"
         tools:targetApi="31">
+
+        <!-- AppMetrica Push: default notification icon -->
+        <meta-data
+            android:name="io.appmetrica.analytics.push.default_notification_icon"
+            android:resource="@drawable/ic_vpn_lock" />
 
         <activity
             android:name=".MainActivity"

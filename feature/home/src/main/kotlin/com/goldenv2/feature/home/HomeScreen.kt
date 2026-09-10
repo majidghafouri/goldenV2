@@ -19,7 +19,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
@@ -48,6 +50,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -61,7 +66,24 @@ import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
 import com.goldenv2.core.ui.theme.GoldenV2Theme
+import com.goldenv2.feature.home.ads.AdsManager
+import com.yandex.mobile.ads.common.AdRequest
+import com.yandex.mobile.ads.compose.Banner
+import com.yandex.mobile.ads.compose.BannerEvents
+import com.yandex.mobile.ads.compose.BannerSize
+import com.yandex.mobile.ads.compose.rememberBannerAdState
 import kotlinx.coroutines.flow.StateFlow
+
+private const val BANNER_AD_UNIT_ID = BuildConfig.YANDEX_BANNER_AD_UNIT_ID
+
+private fun Context.findActivity(): Activity? {
+    var ctx: Context = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 
 @Composable
 fun HomeScreen(
@@ -73,6 +95,8 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val activity = context.findActivity()
+    val adsManager = viewModel.adsManager
 
     // Handle VPN permission request from ViewModel
     LaunchedEffect(viewModel.vpnPermissionRequest) {
@@ -81,6 +105,34 @@ fun HomeScreen(
                 context.startActivity(it)
                 // Reset to avoid re-launching on recomposition
                 viewModel.onVpnPermissionHandled()
+            }
+        }
+    }
+
+    // Initialize the Yandex Mobile Ads SDK as early as possible
+    LaunchedEffect(Unit) {
+        adsManager.initialize(context)
+    }
+
+    // Ask for ad personalization consent on first launch (required for EEA users)
+    val consentState by viewModel.personalizationConsent.collectAsState()
+    if (consentState == null) {
+        ConsentDialog(
+            onAccept = { viewModel.setPersonalizationConsent(true) },
+            onDecline = { viewModel.setPersonalizationConsent(false) }
+        )
+    }
+
+    // Show interstitial ad (every connect press) before the VPN connects
+    val pendingAdServer by viewModel.showInterstitial.collectAsState()
+    pendingAdServer?.let { server ->
+        LaunchedEffect(server) {
+            if (activity != null) {
+                adsManager.showAdOrProceed(activity) {
+                    viewModel.onInterstitialFinished(server)
+                }
+            } else {
+                viewModel.onInterstitialFinished(server)
             }
         }
     }
@@ -102,6 +154,9 @@ GoldenV2IconButton(
                 )
             }
         )
+
+        // Banner ad at the top
+        HomeBannerAd()
 
         // Connection Status Card
         ConnectionStatusCard(
@@ -410,6 +465,73 @@ fun SelectedServerCard(
             }
             androidx.compose.material3.TextButton(onClick = onChangeClick) {
                 Text(text = "Change", fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeBannerAd(modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {    val bannerState = rememberBannerAdState(
+        adSize = BannerSize.Sticky(width = 320.dp),
+        events = BannerEvents()
+    )
+
+    LaunchedEffect(Unit) {
+        bannerState.loadAd(AdRequest.Builder(BANNER_AD_UNIT_ID).build())
+    }
+
+    Banner(
+        state = bannerState,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    )
+}
+
+@Composable
+private fun ConsentDialog(
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDecline) {
+        GoldenV2Card(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = androidx.compose.ui.Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Data & Ads Consent",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = "GoldenV2 uses Yandex Mobile Ads and AppMetrica analytics. " +
+                        "With your consent, data will be processed to personalize ads " +
+                        "and improve the app. You can still use the app and all VPN " +
+                        "features if you decline.",
+                    fontSize = 14.sp
+                )
+                Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDecline,
+                        modifier = androidx.compose.ui.Modifier.weight(1f)
+                    ) {
+                        Text("Decline")
+                    }
+                    Button(
+                        onClick = onAccept,
+                        modifier = androidx.compose.ui.Modifier.weight(1f)
+                    ) {
+                        Text("Accept")
+                    }
+                }
             }
         }
     }

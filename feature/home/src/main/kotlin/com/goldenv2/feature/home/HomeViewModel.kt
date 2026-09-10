@@ -12,6 +12,8 @@ import com.goldenv2.core.domain.usecase.LogUseCase
 import com.goldenv2.core.domain.usecase.ServerManagementUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import com.goldenv2.core.vpn.service.VpnController
+import com.goldenv2.feature.home.ads.AdsManager
+import com.goldenv2.feature.home.ads.ConsentManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,14 +31,29 @@ class HomeViewModel @Inject constructor(
     private val vpnController: VpnController,
     private val serverUseCase: ServerManagementUseCase,
     private val settingsUseCase: SettingsUseCase,
-    private val logUseCase: LogUseCase
+    private val logUseCase: LogUseCase,
+    adsManager: AdsManager,
+    private val consentManager: ConsentManager
 ) : ViewModel() {
+
+    /** Ads manager exposed to the UI for SDK init and showing the interstitial. */
+    val adsManager: AdsManager = adsManager
+
+    /** `null` until the user answers the data-processing consent dialog. */
+    val personalizationConsent: StateFlow<Boolean?> = consentManager.personalizationConsent
+
+    fun setPersonalizationConsent(granted: Boolean) =
+        consentManager.setPersonalizationConsent(granted)
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
 
     private val _vpnPermissionGranted = MutableStateFlow(false)
     val vpnPermissionGranted: StateFlow<Boolean> = _vpnPermissionGranted
+
+    /** One-shot signal to show the interstitial ad before connecting. */
+    private val _showInterstitial = MutableStateFlow<Server?>(null)
+    val showInterstitial: StateFlow<Server?> = _showInterstitial
 
     /**
      * One-shot signal for the Activity to launch the system VPN permission
@@ -106,7 +123,7 @@ class HomeViewModel @Inject constructor(
                     return
                 }
                 if (_vpnPermissionGranted.value) {
-                    connectToServer(server)
+                    _showInterstitial.value = server
                 } else {
                     // Request permission first; onVpnPermissionGranted() will connect right after.
                     requestVpnPermission()
@@ -120,6 +137,16 @@ class HomeViewModel @Inject constructor(
             }
             else -> Unit
         }
+    }
+
+    /**
+     * Called by the UI after the interstitial ad was shown and dismissed
+     * (or skipped because no ad was available). [server] is the server the
+     * user intended to connect to when the ad was requested.
+     */
+    fun onInterstitialFinished(server: Server) {
+        _showInterstitial.value = null
+        connectToServer(server)
     }
 
     private fun connectToServer(server: Server) {
@@ -147,7 +174,7 @@ class HomeViewModel @Inject constructor(
         _vpnPermissionGranted.value = true
         val state = _uiState.value
         if (state.connectionState.status != VpnStatus.Connected) {
-            state.selectedServer?.let { connectToServer(it) }
+            state.selectedServer?.let { _showInterstitial.value = it }
         }
     }
 

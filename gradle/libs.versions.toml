@@ -28,8 +28,12 @@ robolectric = "4.11"
 turbine = "1.0.0"
 coil = "2.6.0"
 accompanist = "0.32.0"
+firebaseMessaging = "24.1.2"
 ktx = "1.12.0"
 apacheSshd = "2.10.0"
+yandexMobileAds = "8.4.0"
+appmetrica = "8.5.1"
+appmetricaPush = "4.3.0"
 
 [libraries]
 # AndroidX
@@ -108,6 +112,15 @@ accompanist-systemuicontroller = { group = "com.google.accompanist", name = "acc
 
 # SSH client (MINA SSHD) - dynamic port forwarding (SOCKS) for SSH servers
 sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "apacheSshd" }
+
+# Yandex Mobile Ads SDK
+yandex-mobileads = { group = "com.yandex.android", name = "mobileads", version.ref = "yandexMobileAds" }
+yandex-mobileads-compose = { group = "com.yandex.android", name = "mobileads-compose", version.ref = "yandexMobileAds" }
+
+# AppMetrica (Yandex analytics: users, retention, crashes, ad revenue)
+appmetrica = { group = "io.appmetrica.analytics", name = "analytics", version.ref = "appmetrica" }
+appmetrica-push = { group = "io.appmetrica.analytics", name = "push", version.ref = "appmetricaPush" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

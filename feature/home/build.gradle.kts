@@ -7,6 +7,16 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+import java.io.FileInputStream
+import java.util.Properties
+
+// Ad unit IDs live in local.properties (gitignored) to keep them out of the public repo.
+// Debug builds fall back to Yandex demo IDs so the public repo stays buildable.
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(FileInputStream(f))
+}
+
 android {
     namespace = "com.goldenv2.feature.home"
     compileSdk = 35
@@ -14,6 +24,21 @@ android {
     defaultConfig {
         minSdk = 24
         targetSdk = 35
+        buildConfigField(
+            "String",
+            "YANDEX_INTERSTITIAL_AD_UNIT_ID",
+            "\"${localProperties.getProperty("YANDEX_INTERSTITIAL_AD_UNIT_ID", "demo-interstitial-yandex")}\""
+        )
+        buildConfigField(
+            "String",
+            "YANDEX_BANNER_AD_UNIT_ID",
+            "\"${localProperties.getProperty("YANDEX_BANNER_AD_UNIT_ID", "demo-banner-yandex")}\""
+        )
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -56,6 +81,10 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
+
+    // Yandex Mobile Ads
+    implementation(libs.yandex.mobileads)
+    implementation(libs.yandex.mobileads.compose)
 
     // Testing
     testImplementation(libs.junit)
