@@ -41,13 +41,30 @@ class GoldenV2Application : Application() {
         AppMetrica.activate(this, config)
         AppMetrica.enableActivityAutoTracking(this)
         // Yandex Mobile Ads SDK auto-reports ad revenue to AppMetrica once activated.
-        // Push activation is a no-op without a Firebase project configured.
-        AppMetricaPush.activate(applicationContext)
+        activatePushIfFirebaseConfigured()
 
         appScope.launch {
             consentManager.personalizationConsent.collect { granted ->
                 AppMetrica.setDataSendingEnabled(granted == true)
             }
+        }
+    }
+
+    /**
+     * AppMetricaPush's default activate() eagerly creates a Firebase push
+     * controller, which throws IllegalStateException when the app has no
+     * Firebase project (google-services.json). Skip push entirely in that case.
+     */
+    private fun activatePushIfFirebaseConfigured() {
+        val googleAppId = resources.getIdentifier("google_app_id", "string", packageName)
+        if (googleAppId == 0) {
+            android.util.Log.i(TAG, "AppMetrica Push skipped: no Firebase project configured")
+            return
+        }
+        try {
+            AppMetricaPush.activate(applicationContext)
+        } catch (e: IllegalStateException) {
+            android.util.Log.w(TAG, "AppMetrica Push activation failed: ${e.message}")
         }
     }
 
