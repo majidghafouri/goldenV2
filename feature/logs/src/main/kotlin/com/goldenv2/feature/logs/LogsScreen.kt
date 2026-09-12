@@ -75,8 +75,24 @@ fun LogsScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val context = LocalContext.current
 
-    Column(
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is LogsEvent.LogsExported ->
+                    snackbarHostState.showSnackbar("Logs exported to ${event.filePath}")
+                is LogsEvent.Error ->
+                    snackbarHostState.showSnackbar(event.message)
+                is LogsEvent.Copied ->
+                    android.widget.Toast.makeText(context, event.text, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+        Column(
         modifier = modifier
             .fillMaxSize()
             .padding(bottom = 80.dp)
@@ -97,7 +113,7 @@ fun LogsScreen(
                 )
                 GoldenV2IconButton(
                     icon = Icons.Filled.Speed,
-                    contentDescription = "Speed Test",
+                    contentDescription = if (uiState.isSpeedTestRunning) "Speed Test Running" else "Speed Test",
                     onClick = { viewModel.onSpeedTest() }
                 )
             }
@@ -112,6 +128,17 @@ fun LogsScreen(
             isAutoScroll = uiState.isAutoScroll,
             onAutoScrollChanged = { viewModel.onAutoScrollChanged(it) }
         )
+
+        // Speed / Ping test results
+        if (uiState.isSpeedTestRunning || uiState.isPingTestRunning || uiState.lastSpeedTest != null || uiState.lastPing != null) {
+            TestResultsCard(
+                isSpeedTestRunning = uiState.isSpeedTestRunning,
+                isPingTestRunning = uiState.isPingTestRunning,
+                lastSpeedTest = uiState.lastSpeedTest,
+                lastPing = uiState.lastPing,
+                onPingTest = { viewModel.onPingTest() }
+            )
+        }
 
         // Log List
         if (uiState.filteredLogs.isEmpty()) {
@@ -141,10 +168,18 @@ fun LogsScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
             ) {
                 items(uiState.filteredLogs.reversed()) { log ->
-                    LogItem(log = log)
+                    LogItem(log = log, onCopied = { text ->
+                        android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
+                    })
                 }
             }
         }
+    }
+
+    androidx.compose.material3.SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = androidx.compose.ui.Modifier.align(Alignment.BottomCenter)
+    )
     }
 }
 
@@ -247,7 +282,7 @@ fun FilterBar(
 }
 
 @Composable
-fun LogItem(log: LogEntry) {
+fun LogItem(log: LogEntry, onCopied: (String) -> Unit = {}) {
     val context = LocalContext.current
     val timeFormat = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
     val time = timeFormat.format(java.util.Date(log.timestamp.toEpochMilli()))
@@ -298,7 +333,7 @@ fun LogItem(log: LogEntry) {
                 IconButton(onClick = {
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
                     clipboard?.setPrimaryClip(ClipData.newPlainText("log", log.toString()))
-                    // TODO: Show toast "Copied"
+                    onCopied("Copied")
                 }) {
                     Icon(
                         imageVector = Icons.Filled.ContentCopy,
@@ -330,6 +365,79 @@ fun LogItem(log: LogEntry) {
                         .fillMaxWidth()
                         .padding(top = 4.dp, start = 24.dp),
                     maxLines = 10
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TestResultsCard(
+    isSpeedTestRunning: Boolean,
+    isPingTestRunning: Boolean,
+    lastSpeedTest: com.goldenv2.core.domain.model.SpeedTestResult?,
+    lastPing: com.goldenv2.core.domain.model.PingResult?,
+    onPingTest: () -> Unit
+) {
+    Card(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(modifier = androidx.compose.ui.Modifier.padding(12.dp)) {
+            Row(
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Connection Tests",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                OutlinedButton(
+                    onClick = onPingTest,
+                    enabled = !isPingTestRunning
+                ) {
+                    Text(if (isPingTestRunning) "Pinging…" else "Ping")
+                }
+            }
+
+            when {
+                isSpeedTestRunning -> Text(
+                    text = "Speed test running…",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = androidx.compose.ui.Modifier.padding(top = 8.dp)
+                )
+                lastSpeedTest != null -> Text(
+                    text = if (lastSpeedTest.success) {
+                        "Download: ${lastSpeedTest.formattedDownload}"
+                    } else {
+                        "Speed test failed: ${lastSpeedTest.errorMessage ?: "unknown error"}"
+                    },
+                    fontSize = 12.sp,
+                    color = if (lastSpeedTest.success) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.error,
+                    modifier = androidx.compose.ui.Modifier.padding(top = 8.dp)
+                )
+            }
+
+            if (!isPingTestRunning && lastPing != null) {
+                Text(
+                    text = if (lastPing.success) {
+                        "Ping: ${lastPing.latencyMs}ms"
+                    } else {
+                        "Ping failed: ${lastPing.errorMessage ?: "host unreachable"}"
+                    },
+                    fontSize = 12.sp,
+                    color = if (lastPing.success) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.error,
+                    modifier = androidx.compose.ui.Modifier.padding(top = 4.dp)
                 )
             }
         }

@@ -49,4 +49,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }

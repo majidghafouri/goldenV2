@@ -73,6 +73,19 @@ fun RoutingScreen(
     onNavigateToLogs: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showImportDialog by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is RoutingEvent.ConfigImported ->
+                    android.widget.Toast.makeText(context, "Routing config imported", android.widget.Toast.LENGTH_SHORT).show()
+                is RoutingEvent.Error ->
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -86,12 +99,17 @@ fun RoutingScreen(
                 GoldenV2IconButton(
                     icon = Icons.Filled.ContentCopy,
                     contentDescription = "Export Config",
-                    onClick = { /* viewModel.onExportConfig() */ }
+                    onClick = {
+                        val json = viewModel.onExportConfig()
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("routing config", json))
+                        android.widget.Toast.makeText(context, "Routing config copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 )
                 GoldenV2IconButton(
                     icon = Icons.Filled.ContentPaste,
                     contentDescription = "Import Config",
-                    onClick = { /* viewModel.onImportConfig("") */ }
+                    onClick = { showImportDialog = true }
                 )
             }
         )
@@ -122,6 +140,64 @@ fun RoutingScreen(
             onIpChanged = { ruleId, ips -> viewModel.onIpChanged(ruleId, ips) },
             onReorder = { from, to -> viewModel.onReorderRules(from, to) }
         )
+    }
+
+    if (showImportDialog) {
+        RoutingImportDialog(
+            onDismiss = { showImportDialog = false },
+            onImport = { text ->
+                viewModel.onImportConfig(text)
+                showImportDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun RoutingImportDialog(
+    onDismiss: () -> Unit,
+    onImport: (String) -> Unit
+) {
+    var configText by remember { mutableStateOf("") }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        GoldenV2Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+            Column(modifier = androidx.compose.ui.Modifier.padding(16.dp)) {
+                Text(
+                    text = "Import Routing Config",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Paste the exported routing config JSON below",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = androidx.compose.ui.Modifier.padding(top = 4.dp)
+                )
+                OutlinedTextField(
+                    value = configText,
+                    onValueChange = { configText = it },
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    placeholder = { Text("{ … }") },
+                    minLines = 4,
+                    maxLines = 8
+                )
+                Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                ) {
+                    OutlinedButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Button(onClick = { onImport(configText) }, enabled = configText.isNotBlank()) {
+                        Text("Import")
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 package com.goldenv2.core.domain.repository
 
 import com.goldenv2.core.domain.model.AppSettings
+import com.goldenv2.core.domain.model.RoutingConfig
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.Subscription
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,9 @@ interface SettingsRepository {
     val settingsFlow: Flow<AppSettings>
     suspend fun saveSettings(settings: AppSettings)
     suspend fun getSettings(): AppSettings
+    val routingConfigFlow: Flow<RoutingConfig?>
+    suspend fun saveRoutingConfig(config: RoutingConfig)
+    suspend fun getRoutingConfig(): RoutingConfig?
     val firstRunFlow: Flow<Boolean>
     suspend fun setFirstRunComplete()
     val lastSelectedServerIdFlow: Flow<String?>

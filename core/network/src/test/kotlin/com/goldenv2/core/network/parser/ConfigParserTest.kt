@@ -32,7 +32,7 @@ class ConfigParserTest {
             }
         """.trimIndent()
 
-        val base64 = android.util.Base64.encodeToString(vmessJson.toByteArray(), android.util.Base64.NO_WRAP)
+        val base64 = java.util.Base64.getEncoder().withoutPadding().encodeToString(vmessJson.toByteArray())
         val uri = "vmess://$base64"
 
         val result = ConfigParserRegistry.parse(uri)
@@ -93,7 +93,7 @@ class ConfigParserTest {
     @Test
     fun `parse valid Shadowsocks URI with base64`() {
         val userInfo = "aes-256-gcm:password123"
-        val base64 = android.util.Base64.encodeToString(userInfo.toByteArray(), android.util.Base64.NO_WRAP)
+        val base64 = java.util.Base64.getEncoder().withoutPadding().encodeToString(userInfo.toByteArray())
         val uri = "ss://$base64@example.com:8388#Test%20SS"
 
         val result = ConfigParserRegistry.parse(uri)
@@ -146,10 +146,12 @@ class ConfigParserTest {
         val server1Json = """{"v":"2","ps":"Server1","add":"server1.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","scy":"auto","net":"tcp","type":"none","tls":"tls"}"""
         val server2Json = """{"v":"2","ps":"Server2","add":"server2.com","port":"8443","id":"22222222-2222-2222-2222-222222222222","aid":"0","scy":"auto","net":"tcp","type":"none","tls":"tls"}"""
 
-        val base64_1 = android.util.Base64.encodeToString(server1Json.toByteArray(), android.util.Base64.NO_WRAP)
-        val base64_2 = android.util.Base64.encodeToString(server2Json.toByteArray(), android.util.Base64.NO_WRAP)
+        val base64_1 = java.util.Base64.getEncoder().withoutPadding().encodeToString(server1Json.toByteArray())
+        val base64_2 = java.util.Base64.getEncoder().withoutPadding().encodeToString(server2Json.toByteArray())
 
-        val subscriptionContent = android.util.Base64.encodeToString("$base64_1\n$base64_2".toByteArray(), android.util.Base64.NO_WRAP)
+        // Real subscriptions encode a list of share URIs (vmess://...) as base64
+        val subscriptionContent = java.util.Base64.getEncoder().withoutPadding()
+            .encodeToString("vmess://$base64_1\nvmess://$base64_2".toByteArray())
 
         val servers = parseSubscriptionContent(subscriptionContent)
 

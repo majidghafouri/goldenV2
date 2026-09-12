@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.goldenv2.core.domain.model.AppSettings
+import com.goldenv2.core.domain.model.RoutingConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -23,6 +24,7 @@ class SettingsDataStore @Inject constructor(
 ) {
     private object Keys {
         val SETTINGS_JSON = stringPreferencesKey("settings_json")
+        val ROUTING_CONFIG_JSON = stringPreferencesKey("routing_config_json")
         val FIRST_RUN = booleanPreferencesKey("first_run")
         val LAST_SELECTED_SERVER_ID = stringPreferencesKey("last_selected_server_id")
     }
@@ -35,6 +37,16 @@ class SettingsDataStore @Inject constructor(
             Json.decodeFromString<AppSettings>(json)
         }
 
+    val routingConfigFlow: Flow<RoutingConfig?> = context.dataStore.data
+        .map { prefs ->
+            val json = prefs[Keys.ROUTING_CONFIG_JSON] ?: return@map null
+            try {
+                Json.decodeFromString<RoutingConfig>(json)
+            } catch (e: kotlinx.serialization.SerializationException) {
+                null
+            }
+        }
+
     val firstRunFlow: Flow<Boolean> = context.dataStore.data
         .map { prefs -> prefs[Keys.FIRST_RUN] ?: true }
 
@@ -45,6 +57,23 @@ class SettingsDataStore @Inject constructor(
         val json = Json.encodeToString(AppSettings.serializer(), settings)
         context.dataStore.edit { prefs ->
             prefs[Keys.SETTINGS_JSON] = json
+        }
+    }
+
+    suspend fun saveRoutingConfig(config: RoutingConfig) {
+        val json = Json.encodeToString(RoutingConfig.serializer(), config)
+        context.dataStore.edit { prefs ->
+            prefs[Keys.ROUTING_CONFIG_JSON] = json
+        }
+    }
+
+    suspend fun getRoutingConfig(): RoutingConfig? {
+        val prefs = context.dataStore.data.first()
+        val json = prefs[Keys.ROUTING_CONFIG_JSON] ?: return null
+        return try {
+            Json.decodeFromString<RoutingConfig>(json)
+        } catch (e: kotlinx.serialization.SerializationException) {
+            null
         }
     }
 

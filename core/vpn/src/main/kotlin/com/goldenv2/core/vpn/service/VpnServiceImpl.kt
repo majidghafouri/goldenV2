@@ -16,6 +16,8 @@ import com.goldenv2.core.domain.model.ConnectionState
 import com.goldenv2.core.domain.model.Protocol
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.VpnStatus
+import com.goldenv2.core.domain.repository.SettingsRepository
+import com.goldenv2.core.domain.repository.ServerRepository
 import com.goldenv2.core.vpn.R
 import com.goldenv2.core.vpn.xray.XrayConfigBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -25,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -49,6 +52,12 @@ class VpnServiceImpl : VpnService() {
 
     @Inject
     lateinit var controller: VpnControllerImpl
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var serverRepository: ServerRepository
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var xrayProcess: Process? = null
@@ -87,7 +96,7 @@ class VpnServiceImpl : VpnService() {
     private val NOTIFICATION_ID = 1001
     private val CHANNEL_ID = "vpn_channel"
 
-    // Xray binary path - TODO: Replace with actual Xray-core AAR integration
+    // Xray binary path, resolved from nativeLibraryDir in extractXrayAssets()
     private var xrayBinaryPath: String? = null
     private var geoipPath: String? = null
     private var geositePath: String? = null
@@ -165,7 +174,14 @@ class VpnServiceImpl : VpnService() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private suspend fun establishTunnel() {
-        val server = controller.consumePendingServer() ?: return
+        // On boot/auto-connect there is no pending server from the UI;
+        // fall back to the last selected server persisted in settings.
+        val server = controller.consumePendingServer()
+            ?: runCatching {
+                val lastServerId = settingsRepository.lastSelectedServerIdFlow.first()
+                lastServerId?.let { serverRepository.getById(it).first() }
+            }.getOrNull()
+            ?: return
 
         while (teardownInProgress.get()) teardownSignal.get().await()
 
@@ -287,14 +303,18 @@ class VpnServiceImpl : VpnService() {
         }
     }
 
-    private fun getSettings(): com.goldenv2.core.domain.model.AppSettings {
-        // TODO: Get from SettingsRepository
-        return com.goldenv2.core.domain.model.AppSettings()
+    private suspend fun getSettings(): com.goldenv2.core.domain.model.AppSettings {
+        return try {
+            settingsRepository.getSettings()
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "Failed to load settings, using defaults", e)
+            com.goldenv2.core.domain.model.AppSettings()
+        }
     }
 
-    private fun getRoutingConfig(): com.goldenv2.core.domain.model.RoutingConfig {
-        // TODO: Get from SettingsRepository
-        return com.goldenv2.core.domain.model.RoutingConfig.default()
+    private suspend fun getRoutingConfig(): com.goldenv2.core.domain.model.RoutingConfig {
+        return settingsRepository.getRoutingConfig()
+            ?: com.goldenv2.core.domain.model.RoutingConfig.default()
     }
 
     private fun writeHevConfig(settings: com.goldenv2.core.domain.model.AppSettings): File {
@@ -366,9 +386,25 @@ class VpnServiceImpl : VpnService() {
         }
     }
 
+    /**
+     * Parses Xray log output and forwards it to logcat with an appropriate
+     * priority. Xray has no per-connection traffic counters in stdout output;
+     * throughput is measured by the stats monitor via hev-socks5-tunnel
+     * (see [startStatsMonitoring]).
+     */
     private fun parseStatsLine(line: String) {
-        // TODO: Parse Xray traffic stats
-        // Example: parse upload/download from log output
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) return
+
+        when {
+            trimmed.contains("[Error]", ignoreCase = true) ||
+                trimmed.contains(" failed", ignoreCase = true) ->
+                android.util.Log.e(TAG, trimmed)
+            trimmed.contains("[Warning]", ignoreCase = true) ->
+                android.util.Log.w(TAG, trimmed)
+            else ->
+                android.util.Log.v(TAG, trimmed)
+        }
     }
 
     private fun startStatsMonitoring() {

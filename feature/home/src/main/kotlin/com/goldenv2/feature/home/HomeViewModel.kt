@@ -12,6 +12,7 @@ import com.goldenv2.core.domain.usecase.LogUseCase
 import com.goldenv2.core.domain.usecase.ServerManagementUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import com.goldenv2.core.vpn.service.VpnController
+import com.goldenv2.feature.home.ads.AdFrequencyManager
 import com.goldenv2.feature.home.ads.AdsManager
 import com.goldenv2.feature.home.ads.ConsentManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,6 +34,7 @@ class HomeViewModel @Inject constructor(
     private val settingsUseCase: SettingsUseCase,
     private val logUseCase: LogUseCase,
     adsManager: AdsManager,
+    private val adFrequencyManager: AdFrequencyManager,
     private val consentManager: ConsentManager
 ) : ViewModel() {
 
@@ -123,7 +125,7 @@ class HomeViewModel @Inject constructor(
                     return
                 }
                 if (_vpnPermissionGranted.value) {
-                    _showInterstitial.value = server
+                    maybeShowInterstitialBeforeConnect(server)
                 } else {
                     // Request permission first; onVpnPermissionGranted() will connect right after.
                     requestVpnPermission()
@@ -174,7 +176,19 @@ class HomeViewModel @Inject constructor(
         _vpnPermissionGranted.value = true
         val state = _uiState.value
         if (state.connectionState.status != VpnStatus.Connected) {
-            state.selectedServer?.let { _showInterstitial.value = it }
+            state.selectedServer?.let { maybeShowInterstitialBeforeConnect(it) }
+        }
+    }
+
+    /**
+     * Shows the interstitial only when the frequency policy allows it
+     * (see [AdFrequencyManager]); otherwise connects immediately.
+     */
+    private fun maybeShowInterstitialBeforeConnect(server: Server) {
+        if (adFrequencyManager.shouldShowAdOnConnect()) {
+            _showInterstitial.value = server
+        } else {
+            connectToServer(server)
         }
     }
 

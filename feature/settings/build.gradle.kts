@@ -57,6 +57,9 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
+    // Serialization (config import/export)
+    implementation(libs.kotlinx.serialization.json)
+
     // Accompanist for permissions
     implementation(libs.accompanist.permissions)
 

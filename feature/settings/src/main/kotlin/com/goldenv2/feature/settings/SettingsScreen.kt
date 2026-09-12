@@ -39,6 +39,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -470,6 +471,19 @@ fun AdvancedSettingsSection(settings: com.goldenv2.core.domain.model.AppSettings
 @Composable
 fun ImportExportSection(viewModel: SettingsViewModel) {
     val context = LocalContext.current
+    var showImportDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is SettingsEvent.ConfigImported ->
+                    android.widget.Toast.makeText(context, "Configuration imported", android.widget.Toast.LENGTH_SHORT).show()
+                is SettingsEvent.Error ->
+                    android.widget.Toast.makeText(context, event.message, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     GoldenV2SectionHeader(title = "Configuration")
 
     GoldenV2Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -482,14 +496,70 @@ fun ImportExportSection(viewModel: SettingsViewModel) {
                     val json = viewModel.onExportConfig()
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
                     clipboard?.setPrimaryClip(ClipData.newPlainText("config", json))
-                    // TODO: Show toast "Copied to clipboard"
+                    android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
                 }) {
                     Text("Export Config")
                 }
-                OutlinedButton(onClick = {
-                    // TODO: Show import dialog
-                }) {
+                OutlinedButton(onClick = { showImportDialog = true }) {
                     Text("Import Config")
+                }
+            }
+        }
+    }
+
+    if (showImportDialog) {
+        ImportConfigDialog(
+            onDismiss = { showImportDialog = false },
+            onImport = { text ->
+                viewModel.onImportConfig(text)
+                showImportDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun ImportConfigDialog(
+    onDismiss: () -> Unit,
+    onImport: (String) -> Unit
+) {
+    var configText by remember { mutableStateOf("") }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        GoldenV2Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+            Column(modifier = androidx.compose.ui.Modifier.padding(16.dp)) {
+                Text(
+                    text = "Import Configuration",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Paste the exported configuration JSON below",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = androidx.compose.ui.Modifier.padding(top = 4.dp)
+                )
+                OutlinedTextField(
+                    value = configText,
+                    onValueChange = { configText = it },
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    placeholder = { Text("{ … }") },
+                    minLines = 4,
+                    maxLines = 8
+                )
+                Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                ) {
+                    OutlinedButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Button(onClick = { onImport(configText) }, enabled = configText.isNotBlank()) {
+                        Text("Import")
+                    }
                 }
             }
         }

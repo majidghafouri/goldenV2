@@ -8,10 +8,13 @@ import com.goldenv2.core.domain.model.RuleType
 import com.goldenv2.core.domain.usecase.LogUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 
@@ -24,16 +27,36 @@ class RoutingViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RoutingUiState())
     val uiState: StateFlow<RoutingUiState> = _uiState
 
+    private val _events = MutableSharedFlow<RoutingEvent>()
+    val events: SharedFlow<RoutingEvent> = _events
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
     init {
         observeRoutingConfig()
     }
 
     private fun observeRoutingConfig() {
         viewModelScope.launch {
-            settingsUseCase.settingsFlow.collect { settings ->
-                // TODO: Get routing config from repository
-                // For now, use default
+            settingsUseCase.routingConfigFlow.collect { config ->
+                if (config != null) {
+                    _uiState.update {
+                        it.copy(routingConfig = config, selectedMode = inferMode(config))
+                    }
+                }
             }
+        }
+    }
+
+    private fun inferMode(config: RoutingConfig): RoutingMode {
+        val ruleTags = config.rules.sortedBy { it.order }.map { it.outboundTag }
+        return when {
+            ruleTags == listOf("proxy") -> RoutingMode.ProxyAll
+            ruleTags == listOf("direct") -> RoutingMode.DirectAll
+            ruleTags.firstOrNull() == "direct" &&
+                ruleTags.getOrNull(1) == "proxy" &&
+                config.rules.firstOrNull()?.ip == listOf("geoip:private") -> RoutingMode.BypassLAN
+            else -> RoutingMode.Custom
         }
     }
 
@@ -128,21 +151,42 @@ class RoutingViewModel @Inject constructor(
         saveRoutingConfig(_uiState.value.routingConfig)
     }
 
-    fun onImportConfig(json: String) {
-        // TODO: Parse and import routing config from JSON
+    fun onImportConfig(text: String) {
+        viewModelScope.launch {
+            try {
+                val config = json.decodeFromString<RoutingConfig>(text.trim())
+                _uiState.update {
+                    it.copy(
+                        routingConfig = config,
+                        selectedMode = inferMode(config),
+                        editingRuleId = null
+                    )
+                }
+                settingsUseCase.saveRoutingConfig(config)
+                logUseCase.i("RoutingViewModel", "Routing config imported: ${config.rules.size} rules")
+                _events.emit(RoutingEvent.ConfigImported)
+            } catch (e: Exception) {
+                logUseCase.e("RoutingViewModel", "Failed to import routing config", e)
+                _events.emit(RoutingEvent.Error("Import failed: invalid routing config JSON"))
+            }
+        }
     }
 
     fun onExportConfig(): String {
-        // TODO: Export routing config as JSON
-        return ""
+        return json.encodeToString(RoutingConfig.serializer(), _uiState.value.routingConfig)
     }
 
     private fun saveRoutingConfig(config: RoutingConfig) {
         viewModelScope.launch {
-            // TODO: Save to SettingsRepository
+            settingsUseCase.saveRoutingConfig(config)
             logUseCase.i("RoutingViewModel", "Routing config saved: ${config.rules.size} rules")
         }
     }
+}
+
+sealed interface RoutingEvent {
+    data object ConfigImported : RoutingEvent
+    data class Error(val message: String) : RoutingEvent
 }
 
 data class RoutingUiState(

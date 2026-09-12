@@ -11,10 +11,13 @@ import com.goldenv2.core.domain.usecase.LogUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -24,6 +27,11 @@ class SettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState
+
+    private val _events = MutableSharedFlow<SettingsEvent>()
+    val events: SharedFlow<SettingsEvent> = _events
+
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     init {
         observeSettings()
@@ -125,20 +133,22 @@ class SettingsViewModel @Inject constructor(
         updateSettings { copy(bypassUids = uids) }
     }
 
-    fun onImportConfig(json: String) {
+    fun onImportConfig(text: String) {
         viewModelScope.launch {
             try {
-                val settings = AppSettings()
-                settingsUseCase.saveSettings(settings)
+                val imported = json.decodeFromString<AppSettings>(text.trim())
+                settingsUseCase.saveSettings(imported)
                 logUseCase.i("SettingsViewModel", "Configuration imported successfully")
+                _events.emit(SettingsEvent.ConfigImported)
             } catch (e: Exception) {
                 logUseCase.e("SettingsViewModel", "Failed to import configuration", e)
+                _events.emit(SettingsEvent.Error("Import failed: invalid configuration JSON"))
             }
         }
     }
 
     fun onExportConfig(): String {
-        return _uiState.value.settings.toString()
+        return json.encodeToString(AppSettings.serializer(), _uiState.value.settings)
     }
 
     fun onClearLogs() {
@@ -159,3 +169,8 @@ data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     val isLoading: Boolean = false
 )
+
+sealed interface SettingsEvent {
+    data object ConfigImported : SettingsEvent
+    data class Error(val message: String) : SettingsEvent
+}

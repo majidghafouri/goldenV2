@@ -157,7 +157,7 @@ class VlessParser : BaseParser() {
             val query = if (queryStart != -1) hostPortQuery.substring(queryStart) else ""
 
             val (address, port) = extractHostPort(hostPort)
-            val params = parseQueryParams("?" + query)
+            val params = parseQueryParams(query)
 
             val id = generateId()
             val network = NetworkType.valueOf(params["type"]?.lowercase() ?: "tcp")
@@ -225,7 +225,7 @@ class TrojanParser : BaseParser() {
             val query = if (queryStart != -1) hostPortQuery.substring(queryStart) else ""
 
             val (address, port) = extractHostPort(hostPort)
-            val params = parseQueryParams("?" + query)
+            val params = parseQueryParams(query)
 
             val id = generateId()
             val network = NetworkType.valueOf(params["type"]?.lowercase() ?: "tcp")
@@ -362,7 +362,7 @@ class Hysteria2Parser : BaseParser() {
             val query = if (queryStart != -1) hostPortQuery.substring(queryStart) else ""
 
             val (address, port) = extractHostPort(hostPort)
-            val params = parseQueryParams("?" + query)
+            val params = parseQueryParams(query)
 
             val id = generateId()
             val sni = params["sni"] ?: address
@@ -414,7 +414,7 @@ class SshParser : BaseParser() {
             val query = if (queryStart != -1) hostPortQuery.substring(queryStart) else ""
 
             val (address, port) = extractHostPort(hostPort)
-            val params = parseQueryParams("?" + query)
+            val params = parseQueryParams(query)
 
             val (username, password) = if (userInfo.contains(":")) {
                 val parts = userInfo.split(":", limit = 2)

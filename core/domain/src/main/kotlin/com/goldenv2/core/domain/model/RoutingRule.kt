@@ -4,7 +4,6 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 import com.goldenv2.core.data.db.Converters
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -26,8 +25,8 @@ data class RoutingRule(
     val outboundTag: String,
     val enabled: Boolean = true,
     val order: Int = 0,
-    @Contextual val createdAt: Instant = Instant.now(),
-    @Contextual val updatedAt: Instant = Instant.now()
+    @Serializable(with = InstantSerializer::class) val createdAt: Instant = Instant.now(),
+    @Serializable(with = InstantSerializer::class) val updatedAt: Instant = Instant.now()
 )
 
 @Serializable

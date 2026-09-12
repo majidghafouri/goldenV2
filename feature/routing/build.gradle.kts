@@ -56,6 +56,9 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
+    // Serialization (routing config import/export)
+    implementation(libs.kotlinx.serialization.json)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
