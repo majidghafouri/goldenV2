@@ -11,6 +11,7 @@ import com.goldenv2.core.domain.usecase.ServerManagementUseCase
 import com.goldenv2.core.domain.usecase.SettingsUseCase
 import com.goldenv2.core.domain.usecase.SubscriptionUseCase
 import com.goldenv2.core.network.SubscriptionFetcher
+import com.goldenv2.core.network.parser.ServerUriSerializer
 import com.goldenv2.core.network.parser.parseSubscriptionContent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -339,6 +340,20 @@ class ServersViewModel @Inject constructor(
             onDismissEditServerSheet()
         }
     }
+
+    fun onShareServer(server: Server) {
+        val uri = try {
+            ServerUriSerializer.toUri(server)
+        } catch (e: Exception) {
+            setImportResult("Sharing ${server.protocol.name} configs is not supported yet", isError = true)
+            return
+        }
+        _uiState.update { it.copy(showShareSheet = true, shareServerUri = uri, shareServerName = server.name) }
+    }
+
+    fun onDismissShareSheet() {
+        _uiState.update { it.copy(showShareSheet = false, shareServerUri = null, shareServerName = null) }
+    }
 }
 
 data class ServersUiState(
@@ -357,5 +372,8 @@ data class ServersUiState(
     val showServerContextMenu: Boolean = false,
     val contextMenuServer: Server? = null,
     val showEditServerSheet: Boolean = false,
-    val editServer: Server? = null
+    val editServer: Server? = null,
+    val showShareSheet: Boolean = false,
+    val shareServerUri: String? = null,
+    val shareServerName: String? = null
 )

@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -262,6 +263,7 @@ fun ServersScreen(
             onDismiss = viewModel::onDismissContextMenu,
             onTestLatency = { viewModel.onTestLatency(contextMenuServer!!); viewModel.onDismissContextMenu() },
             onEdit = { viewModel.onEditServer(contextMenuServer!!) },
+            onShare = { viewModel.onShareServer(contextMenuServer!!); viewModel.onDismissContextMenu() },
             onDuplicate = { viewModel.onDuplicateServer(contextMenuServer!!); viewModel.onDismissContextMenu() },
             onDelete = { viewModel.onDeleteServer(contextMenuServer!!); viewModel.onDismissContextMenu() }
         )
@@ -293,6 +295,13 @@ fun ServersScreen(
             server = uiState.editServer!!,
             onDismiss = viewModel::onDismissEditServerSheet,
             onUpdate = viewModel::onUpdateServer
+        )
+    }
+    if (uiState.showShareSheet && uiState.shareServerUri != null) {
+        ShareServerSheet(
+            configUri = uiState.shareServerUri!!,
+            serverName = uiState.shareServerName ?: "Server",
+            onDismiss = viewModel::onDismissShareSheet
         )
     }
     if (uiState.showQrScanner) {
@@ -1326,6 +1335,7 @@ fun ServerContextMenu(
     onDismiss: () -> Unit,
     onTestLatency: () -> Unit,
     onEdit: () -> Unit,
+    onShare: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -1364,6 +1374,13 @@ fun ServerContextMenu(
                     modifier = androidx.compose.ui.Modifier
                         .fillMaxWidth()
                         .clickable { onEdit() }
+                )
+                ListItem(
+                    headlineContent = { Text("Share") },
+                    leadingContent = { Icon(Icons.Filled.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .clickable { onShare() }
                 )
                 ListItem(
                     headlineContent = { Text("Duplicate") },
