@@ -23,6 +23,9 @@ object ServerUriSerializer {
             Protocol.VLESS, Protocol.Trojan -> userInfoUri(server)
             Protocol.Shadowsocks -> shadowsocksUri(server)
             Protocol.Hysteria2 -> hysteria2Uri(server)
+            Protocol.Hysteria -> hysteria1Uri(server)
+            Protocol.Tuic -> tuicUri(server)
+            Protocol.WireGuard -> wireguardUri(server)
             Protocol.Ssh -> sshUri(server)
             else -> unsupported(server)
         }
@@ -127,6 +130,47 @@ object ServerUriSerializer {
         val query = if (queryString.isNotEmpty()) "?$queryString" else ""
         val password = server.password.orEmpty()
         return "hysteria2://$password@${hostPort(server)}$query#${encodeFragment(server.name)}"
+    }
+
+    private fun hysteria1Uri(server: Server): String {
+        // hysteria://password@host:port?protocol=&obfs=&auth_param=&peer=&insecure=0#name
+        val params = listOf(
+            "protocol" to server.network.name.takeIf { it != "tcp" },
+            "peer" to server.sni,
+            "obfs" to server.obfs,
+            "auth_param" to server.obfsParam,
+            "insecure" to if (server.tls) "0" else "1"
+        )
+        val queryString = encodeQueryParams(params.filter { it.second != null })
+        val query = if (queryString.isNotEmpty()) "?$queryString" else ""
+        val password = server.password.orEmpty()
+        return "hysteria://$password@${hostPort(server)}$query#${encodeFragment(server.name)}"
+    }
+
+    private fun tuicUri(server: Server): String {
+        // tuic5://uuid:password@host:port?sni=&#name
+        val params = listOf(
+            "sni" to server.sni,
+            "token" to server.password
+        )
+        val queryString = encodeQueryParams(params.filter { it.second != null })
+        val query = if (queryString.isNotEmpty()) "?$queryString" else ""
+        val userInfo = listOfNotNull(server.uuid, server.password).joinToString(":")
+        return "tuic5://$userInfo@${hostPort(server)}$query#${encodeFragment(server.name)}"
+    }
+
+    private fun wireguardUri(server: Server): String {
+        // wg://privatekey:address@host:port?publickey=&allowedips=&label=
+        val privateKey = server.uuid.orEmpty()
+        val address = server.path ?: "10.0.0.2/32"
+        val params = listOf(
+            "publickey" to server.publicKey,
+            "allowedips" to (server.host ?: "0.0.0.0/0"),
+            "label" to server.name
+        )
+        val queryString = encodeQueryParams(params.filter { it.second != null })
+        val query = if (queryString.isNotEmpty()) "?$queryString" else ""
+        return "wg://$privateKey:$address@${hostPort(server)}$query"
     }
 
     private fun sshUri(server: Server): String {

@@ -187,4 +187,67 @@ class ServerUriSerializerTest {
         assertEquals("/sdcard/key.pem", parsed.path)
         assertEquals("keypassphrase", parsed.host)
     }
+
+    @Test
+    fun `hysteria1 uri format`() {
+        val server = Server(
+            subscriptionId = "",
+            name = "My Hy",
+            protocol = Protocol.Hysteria,
+            address = "hy.example.com",
+            port = 443,
+            password = "hypass",
+            sni = "hy.example.com",
+            obfs = "obfsstr",
+            obfsParam = "obfspass"
+        )
+
+        val uri = ServerUriSerializer.toUri(server)
+        assertTrue(uri.startsWith("hysteria://hypass@hy.example.com:443?"))
+        assertTrue("peer=hy.example.com" in uri || "peer=hy%2Eexample%2Ecom" in uri)
+        assertTrue(uri.contains("obfs="))
+        assertTrue(uri.contains("auth_param="))
+        assertTrue(uri.endsWith("#My%20Hy") || uri.endsWith("#My+Hy"))
+    }
+
+    @Test
+    fun `tuic uri format`() {
+        val server = Server(
+            subscriptionId = "",
+            name = "My Tuic",
+            protocol = Protocol.Tuic,
+            address = "tuic.example.com",
+            port = 443,
+            uuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            password = "tuicpass",
+            sni = "tuic.example.com"
+        )
+
+        val uri = ServerUriSerializer.toUri(server)
+        assertTrue(uri.startsWith("tuic5://aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:tuicpass@tuic.example.com:443?"))
+        assertTrue(uri.contains("sni="))
+        assertTrue(uri.contains("#"))
+    }
+
+    @Test
+    fun `wireguard uri format`() {
+        val server = Server(
+            subscriptionId = "",
+            name = "My WG",
+            protocol = Protocol.WireGuard,
+            address = "wg.example.com",
+            port = 51820,
+            uuid = "PRIVATEkey==",
+            publicKey = "PUBLICkey==",
+            host = "10.0.0.0/24",
+            path = "10.0.0.5/32"
+        )
+
+        val uri = ServerUriSerializer.toUri(server)
+        assertTrue(uri.startsWith("wg://"))
+        assertTrue(uri.contains("@wg.example.com:51820"))
+        assertTrue(uri.contains("publickey="))
+        assertTrue(uri.contains("allowedips="))
+        assertTrue(uri.contains("label="))
+    }
 }

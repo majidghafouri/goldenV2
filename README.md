@@ -119,9 +119,7 @@ The following permissions and components are declared in `core/vpn/src/main/Andr
 </receiver>
 ```
 
-### Key Integration Points (TODO Markers)
-
-Search for `// TODO:` comments in these files:
+### Key Integration Points
 
 1. **`core/vpn/service/VpnServiceImpl.kt`**:
    - `findXrayBinary()` - Locate Xray binary
@@ -138,7 +136,11 @@ Search for `// TODO:` comments in these files:
    - Additional protocol parsers if needed
    - Subscription content parsing
 
-4. **`feature/home/HomeViewModel.kt`**:
+4. **`core/network/parser/ServerUriSerializer.kt`**:
+   - Share/export URIs per protocol (inverse of the parsers)
+   - Hysteria (v1), Tuic, and WireGuard URIs are generated but not re-parseable yet (`ConfigParserRegistry` has no parsers for them)
+
+5. **`feature/home/HomeViewModel.kt`**:
    - VPN permission request handling
 
 ## Architecture Overview
