@@ -17,7 +17,7 @@ data class ConnectionState(
     val isReconnecting: Boolean = false
 ) {
     val uptime: Long
-        get() = connectedAt?.let { Instant.now().toEpochMilli() - it.toEpochMilli() } ?: 0
+        get() = connectedAt?.let { val now = System.currentTimeMillis(); val conn = it.epochSecond * 1000 + it.nano / 1_000_000; now - conn } ?: 0
 
     val isConnected: Boolean
         get() = status == VpnStatus.Connected
