@@ -28,11 +28,7 @@ class BootReceiver : BroadcastReceiver() {
                     val settings = settingsRepository.getSettings()
                     if (settings.autoConnectOnBoot) {
                         val serviceIntent = Intent(context, VpnServiceImpl::class.java)
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            context.startForegroundService(serviceIntent)
-                        } else {
-                            context.startService(serviceIntent)
-                        }
+                        context.startService(serviceIntent)
                     }
                 } finally {
                     pendingResult.finish()

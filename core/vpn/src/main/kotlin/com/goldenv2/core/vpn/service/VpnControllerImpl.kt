@@ -3,7 +3,6 @@ package com.goldenv2.core.vpn.service
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
-import androidx.core.content.ContextCompat
 import com.goldenv2.core.domain.model.ConnectionState
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.VpnStatus
@@ -40,8 +39,7 @@ class VpnControllerImpl @Inject constructor(
     override suspend fun start(server: Server) {
         pendingServer.set(server)
         _connectionState.update { it.copy(status = VpnStatus.Connecting, currentServer = server) }
-        ContextCompat.startForegroundService(
-            context,
+        context.startService(
             Intent(context, VpnServiceImpl::class.java).apply { action = VpnServiceImpl.ACTION_CONNECT }
         )
     }
@@ -52,7 +50,7 @@ class VpnControllerImpl @Inject constructor(
         // so the teardown would never run and a later connect would silently
         // early-return (isRunning still true).
         val stopIntent = Intent(context, VpnServiceImpl::class.java).apply { action = VpnServiceImpl.ACTION_STOP }
-        ContextCompat.startForegroundService(context, stopIntent)
+        context.startService(stopIntent)
         _connectionState.update {
             it.copy(status = VpnStatus.Disconnected, currentServer = null, connectedAt = null)
         }

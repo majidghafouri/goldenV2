@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.IBinder
@@ -152,15 +151,8 @@ class VpnServiceImpl : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notification = buildNotification("GoldenV2 VPN", "Ready to connect", 0, 0)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
-        }
         if (intent?.action == ACTION_CONNECT) {
+            postConnectingNotification()
             scope.launch { establishTunnel() }
         } else if (intent?.action == ACTION_STOP) {
             scope.launch {
@@ -466,6 +458,12 @@ class VpnServiceImpl : VpnService() {
         nm.notify(NOTIFICATION_ID, notification)
     }
 
+    private fun postConnectingNotification() {
+        val notification = buildNotification("Connected: ${controller.connectionState.value.currentServer?.name ?: "GoldenV2 VPN"}", "Connecting…", 0, 0)
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.notify(NOTIFICATION_ID, notification)
+    }
+
     private fun buildNotification(title: String, text: String, uploadSpeed: Long, downloadSpeed: Long): Notification {
         val intent = Intent(this, VpnServiceImpl::class.java)
         val pendingIntent = PendingIntent.getActivity(
@@ -482,9 +480,7 @@ class VpnServiceImpl : VpnService() {
             .setContentText("$text $speedText")
             .setSmallIcon(R.drawable.ic_vpn_lock)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setOnlyAlertOnce(true)
             .build()
     }
 
