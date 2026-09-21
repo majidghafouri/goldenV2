@@ -129,9 +129,7 @@ fun ServersScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
-            modifier = androidx.compose.ui.Modifier
-                .fillMaxSize()
-                .padding(bottom = 80.dp)
+            modifier = androidx.compose.ui.Modifier.fillMaxSize()
         ) {
             // Top App Bar
             TopAppBar(

@@ -190,6 +190,7 @@ class VpnServiceImpl : VpnService() {
         if (prepareIntent != null) {
             controller.updateState { it.copy(
                 status = VpnStatus.Error,
+                currentServer = null,
                 lastError = "VPN permission not granted. Please grant VPN permission in system settings."
             ) }
             return
@@ -199,7 +200,7 @@ class VpnServiceImpl : VpnService() {
             if (isRunning.get() || teardownInProgress.get()) return
 
             if (!extractXrayAssets()) {
-                controller.updateState { it.copy(status = VpnStatus.Error, lastError = "Failed to extract Xray assets") }
+                controller.updateState { it.copy(status = VpnStatus.Error, currentServer = null, lastError = "Failed to extract Xray assets") }
                 return
             }
 
@@ -246,7 +247,7 @@ class VpnServiceImpl : VpnService() {
                     val tunnel = SshTunnel(server, this)
                     val err = tunnel.start()
                     if (err != null) {
-                        controller.updateState { it.copy(status = VpnStatus.Error, lastError = "SSH tunnel: $err") }
+                        controller.updateState { it.copy(status = VpnStatus.Error, currentServer = null, lastError = "SSH tunnel: $err") }
                         vpnInterface?.close()
                         vpnInterface = null
                         return
@@ -292,7 +293,7 @@ class VpnServiceImpl : VpnService() {
 
             } catch (e: Throwable) {
                 android.util.Log.e(TAG, "establishTunnel failed", e)
-                controller.updateState { it.copy(status = VpnStatus.Error, lastError = e.message) }
+                controller.updateState { it.copy(status = VpnStatus.Error, currentServer = null, lastError = e.message) }
                 teardown()
             }
         }
