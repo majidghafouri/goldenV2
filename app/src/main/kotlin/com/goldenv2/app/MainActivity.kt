@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(
                                 viewModel = homeViewModel,
                                 onNavigateToServers = { navController.navigate("servers") },
+                                onNavigateToRouting = { navController.navigate("routing") },
                                 onNavigateToSettings = { navController.navigate("settings") },
                                 onNavigateToLogs = { navController.navigate("logs") }
                             )

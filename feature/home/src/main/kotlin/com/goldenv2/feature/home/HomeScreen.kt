@@ -93,6 +93,7 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     onNavigateToServers: () -> Unit,
+    onNavigateToRouting: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToLogs: () -> Unit
 ) {
@@ -178,6 +179,7 @@ GoldenV2IconButton(
         // Quick Actions
         QuickActionsCard(
             onServersClick = onNavigateToServers,
+            onRoutingClick = onNavigateToRouting,
             onLogsClick = onNavigateToLogs,
             onSettingsClick = onNavigateToSettings
         )
@@ -408,6 +410,7 @@ fun StatItem(
 @Composable
 fun QuickActionsCard(
     onServersClick: () -> Unit,
+    onRoutingClick: () -> Unit,
     onLogsClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
@@ -419,7 +422,7 @@ fun QuickActionsCard(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 QuickActionButton(icon = Icons.Filled.Dns, label = "Servers", onClick = onServersClick)
-                QuickActionButton(icon = Icons.Filled.Route, label = "Routing", onClick = onSettingsClick)
+                QuickActionButton(icon = Icons.Filled.Route, label = "Routing", onClick = onRoutingClick)
                 QuickActionButton(icon = Icons.Filled.BugReport, label = "Logs", onClick = onLogsClick)
                 QuickActionButton(icon = Icons.Filled.Settings, label = "Settings", onClick = onSettingsClick)
             }

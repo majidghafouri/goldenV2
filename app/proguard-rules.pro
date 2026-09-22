@@ -47,6 +47,24 @@
 
 # Don't obfuscate enums
 -keepclassmembers enum * {
-    public static **[] values();
+    public static ** values();
     public static ** valueOf(java.lang.String);
 }
+
+# Optional SSH/EdDSA classes not shipped with the SSHJ dependency
+-dontwarn javax.security.auth.login.CredentialException
+-dontwarn javax.security.auth.login.FailedLoginException
+-dontwarn net.i2p.crypto.eddsa.EdDSAPrivateKey
+-dontwarn net.i2p.crypto.eddsa.EdDSAPublicKey
+-dontwarn net.i2p.crypto.eddsa.math.Curve
+-dontwarn net.i2p.crypto.eddsa.math.GroupElement
+-dontwarn net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec
+-dontwarn net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable
+-dontwarn net.i2p.crypto.eddsa.spec.EdDSAParameterSpec
+-dontwarn net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec
+-dontwarn net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec
+-dontwarn net.i2p.crypto.eddsa.EdDSAKey
+
+# SSHD loads its security provider registrars reflectively by class name
+-keep class org.apache.sshd.common.util.security.bouncycastle.** { *; }
+-keep class org.apache.sshd.common.util.security.eddsa.** { *; }
