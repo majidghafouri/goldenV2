@@ -40,7 +40,7 @@ class GoldenV2Application : Application() {
             .build()
         AppMetrica.activate(this, config)
         AppMetrica.enableActivityAutoTracking(this)
-        // Yandex Mobile Ads SDK auto-reports ad revenue to AppMetrica once activated.
+        // The ad SDK auto-reports ad revenue to AppMetrica once activated.
         activatePushIfFirebaseConfigured()
 
         appScope.launch {

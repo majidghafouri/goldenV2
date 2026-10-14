@@ -69,15 +69,9 @@ import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
 import com.goldenv2.core.ui.theme.GoldenV2Theme
+import com.goldenv2.feature.home.ads.AdProvider
 import com.goldenv2.feature.home.ads.AdsManager
-import com.yandex.mobile.ads.common.AdRequest
-import com.yandex.mobile.ads.compose.Banner
-import com.yandex.mobile.ads.compose.BannerEvents
-import com.yandex.mobile.ads.compose.BannerSize
-import com.yandex.mobile.ads.compose.rememberBannerAdState
 import kotlinx.coroutines.flow.StateFlow
-
-private const val BANNER_AD_UNIT_ID = BuildConfig.YANDEX_BANNER_AD_UNIT_ID
 
 private fun Context.findActivity(): Activity? {
     var ctx: Context = this
@@ -102,6 +96,9 @@ fun HomeScreen(
     val activity = context.findActivity()
     val adsManager = viewModel.adsManager
 
+    // Ad network currently serving ads (AdMob, or Yandex when AdMob is unavailable)
+    val adProvider by adsManager.activeProvider.collectAsState()
+
     // Handle VPN permission request from ViewModel
     LaunchedEffect(viewModel.vpnPermissionRequest) {
         viewModel.vpnPermissionRequest.collect { intent ->
@@ -113,7 +110,7 @@ fun HomeScreen(
         }
     }
 
-    // Initialize the Yandex Mobile Ads SDK as early as possible
+    // Pick and initialize the ad network as early as possible
     LaunchedEffect(Unit) {
         adsManager.initialize(context)
     }
@@ -160,9 +157,6 @@ GoldenV2IconButton(
             }
         )
 
-        // Banner ad at the top
-        HomeBannerAd()
-
         // Connection Status Card
         ConnectionStatusCard(
             connectionState = uiState.connectionState,
@@ -187,6 +181,14 @@ GoldenV2IconButton(
         // Current Server Info
         if (uiState.selectedServer != null && !uiState.connectionState.isConnected) {
             SelectedServerCard(server = uiState.selectedServer!!, onChangeClick = onNavigateToServers)
+        }
+
+        // Banner ad at the very bottom (hidden until consent is answered)
+        if (consentState != null) {
+            HomeBannerAd(
+                provider = adProvider,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
     }
 }
@@ -484,22 +486,16 @@ fun SelectedServerCard(
     }
 }
 
+/**
+ * Renders the banner of whichever ad network is active (AdMob, or Yandex when
+ * AdMob is unavailable). Renders nothing when no network can serve ads.
+ */
 @Composable
-fun HomeBannerAd(modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {    val bannerState = rememberBannerAdState(
-        adSize = BannerSize.Sticky(width = 320.dp),
-        events = BannerEvents()
-    )
-
-    LaunchedEffect(Unit) {
-        bannerState.loadAd(AdRequest.Builder(BANNER_AD_UNIT_ID).build())
-    }
-
-    Banner(
-        state = bannerState,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    )
+fun HomeBannerAd(
+    provider: AdProvider,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
+) {
+    provider.Banner(modifier)
 }
 
 @Composable
@@ -523,7 +519,8 @@ private fun ConsentDialog(
                     fontSize = 18.sp
                 )
                 Text(
-                    text = "GoldenV2 uses Yandex Mobile Ads and AppMetrica analytics. " +
+                    text = "GoldenV2 uses Google AdMob (or Yandex Mobile Ads when " +
+                        "AdMob is unavailable) and AppMetrica analytics. " +
                         "With your consent, data will be processed to personalize ads " +
                         "and improve the app. You can still use the app and all VPN " +
                         "features if you decline.",

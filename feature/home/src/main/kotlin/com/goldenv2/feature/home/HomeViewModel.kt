@@ -44,8 +44,11 @@ class HomeViewModel @Inject constructor(
     /** `null` until the user answers the data-processing consent dialog. */
     val personalizationConsent: StateFlow<Boolean?> = consentManager.personalizationConsent
 
-    fun setPersonalizationConsent(granted: Boolean) =
+    fun setPersonalizationConsent(granted: Boolean) {
         consentManager.setPersonalizationConsent(granted)
+        // Push the new answer to the ad networks (AdMob opt-out state / Yandex consent).
+        adsManager.onConsentChanged(granted)
+    }
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
@@ -59,10 +62,18 @@ class HomeViewModel @Inject constructor(
 
     /**
      * One-shot signal for the Activity to launch the system VPN permission
-     * dialog. Emits the Intent returned by VpnService.prepare().
+     * dialog, carrying the Intent returned by VpnService.prepare().
+     *
+     * Deliberately a SharedFlow with no replay rather than a StateFlow: the
+     * Activity collects this inside repeatOnLifecycle(RESUMED), which re-collects
+     * on every resume. A StateFlow would replay a stale Intent each time and
+     * re-open the dialog the user had already dismissed.
      */
-    private val _vpnPermissionRequest = MutableStateFlow<Intent?>(null)
-    val vpnPermissionRequest: StateFlow<Intent?> = _vpnPermissionRequest
+    private val _vpnPermissionRequest = MutableSharedFlow<Intent>(
+        replay = 0,
+        extraBufferCapacity = 1
+    )
+    val vpnPermissionRequest: SharedFlow<Intent> = _vpnPermissionRequest
 
     init {
         observeVpnState()
@@ -168,7 +179,7 @@ class HomeViewModel @Inject constructor(
     private fun requestVpnPermission() {
         val intent = vpnController.requestVpnPermission()
         if (intent != null) {
-            _vpnPermissionRequest.value = intent
+            _vpnPermissionRequest.tryEmit(intent)
         }
     }
 
@@ -196,10 +207,6 @@ class HomeViewModel @Inject constructor(
         _vpnPermissionGranted.value = false
         _uiState.update { it.copy(connectionState = it.connectionState.copy(status = VpnStatus.PermissionRequired)) }
         viewModelScope.launch { logUseCase.w("HomeViewModel", "VPN permission denied") }
-    }
-
-    fun onVpnPermissionHandled() {
-        _vpnPermissionRequest.value = null
     }
 }
 
