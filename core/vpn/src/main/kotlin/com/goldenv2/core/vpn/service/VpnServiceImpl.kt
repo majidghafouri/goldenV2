@@ -541,10 +541,11 @@ class VpnServiceImpl : VpnService() {
                 }
             }
             withContext(Dispatchers.Main) {
+                // The tunnel notification is posted with NotificationManager, not
+                // startForeground(), so cancelling is all that teardown needs.
                 runCatching {
                     val nm = getSystemService(NotificationManager::class.java)
                     nm.cancel(NOTIFICATION_ID)
-                    stopForeground(true)
                 }
             }
             signal.complete(Unit)
