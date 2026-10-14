@@ -1,6 +1,6 @@
 # Privacy Policy for GoldenV2
 
-_Last updated: September 11, 2026_
+_Last updated: October 3, 2026_
 
 This Privacy Policy describes how GoldenV2 ("the App", "we", "us") handles information when you use our Android application. The App is a VPN client: it connects to proxy servers that **you** configure or subscribe to. We do not operate those servers and this policy does not cover them.
 
@@ -8,7 +8,8 @@ This Privacy Policy describes how GoldenV2 ("the App", "we", "us") handles infor
 
 - We do **not** collect or transmit your browsing traffic, VPN destination addresses, or connection content.
 - Analytics and advertising data is collected **only with your consent**, via a first-launch dialog.
-- If you decline consent, no analytics or advertising identifiers are collected.
+- If you decline consent, no analytics data is sent and ads are requested without personalization.
+- Advertising is served by Google AdMob, or by Yandex Mobile Ads on devices where AdMob is unavailable.
 - VPN connection data never leaves your device, except to your chosen proxy server, as required to establish the tunnel.
 
 ## Data We Do NOT Collect
@@ -21,9 +22,11 @@ This Privacy Policy describes how GoldenV2 ("the App", "we", "us") handles infor
 
 On first launch, the App shows a consent dialog ("Data & Ads Consent"). Your choice is stored on your device and applied immediately.
 
+The App uses **Google AdMob** for advertising where it is available, and falls back to **Yandex Mobile Ads** where AdMob cannot serve (for example, on devices without Google Play Services). Only one advertising network is active at a time.
+
 ### If you ACCEPT
 
-The App integrates two Yandex services:
+The App integrates the following services:
 
 **1. Yandex AppMetrica (analytics)**
 
@@ -37,18 +40,19 @@ Collected to understand app usage and stability:
 
 Data is collected by Yandex AppMetrica and processed under the [Yandex AppMetrica Terms](https://yandex.com/legal/appmetrica_termsofuse/).
 
-**2. Yandex Mobile Ads (advertising)**
+**2. Advertising — Google AdMob and/or Yandex Mobile Ads**
 
 - The App shows banner ads on the Home screen and an interstitial ad before connecting
 - With consent, ads may be personalized using advertising identifiers and collected usage data
-- Yandex and its partners use advertising identifiers (e.g., Google Advertising ID, if available on your device) for ad delivery and frequency capping
+- Ad networks and their partners use advertising identifiers (e.g., Google Advertising ID, if available on your device) for ad delivery and frequency capping
 - Ad revenue attribution and ad interaction events are reported to AppMetrica
-- Processing is described in the [Yandex Mobile Ads Terms and privacy documentation](https://yandex.com/legal/mobileads_agreement/)
+- Google: processing is described in the [Google Privacy & Terms](https://policies.google.com/technologies/partner-sites) and the [Google Ads data disclosure](https://policies.google.com/ads)
+- Yandex: processing is described in the [Yandex Mobile Ads Terms and privacy documentation](https://yandex.com/legal/mobileads_agreement/)
 
 ### If you DECLINE
 
 - **No analytics data is sent** to AppMetrica (data sending is fully disabled)
-- Ads continue to be shown but are **non-personalized (contextual)**, in line with the Yandex Mobile Ads SDK's consent requirement
+- Ads continue to be shown but are **non-personalized (contextual)**: AdMob receives an explicit request to opt out of personalized ads, and Yandex Mobile Ads is set to non-personalized
 - Advertising identifiers are not used for personalization
 
 Declining does not restrict any VPN feature.
@@ -86,7 +90,7 @@ The App connects to **proxy servers that you configure**. Your traffic, includin
 ## Your Rights and Choices
 
 - **Consent**: You can review the consent dialog by clearing the App's data or reinstalling. All analytics and personalized advertising is disabled unless you accept.
-- **Delete data**: Uninstalling the App removes all local data. To exercise data deletion rights for analytics data collected by Yandex, refer to [Yandex's privacy documentation](https://yandex.com/legal/confidential/).
+- **Delete data**: Uninstalling the App removes all local data. To exercise data deletion rights for analytics data collected by Yandex, refer to [Yandex's privacy documentation](https://yandex.com/legal/confidential/). For Google, use [Google's Ads Settings](https://adssettings.google.com/) and [My Activity](https://myaccount.google.com/data-and-privacy).
 - **Opt out of ad personalization**: You can also reset or delete your Advertising ID in your device Settings (Settings > Privacy > Ads).
 
 ## Security
@@ -107,3 +111,4 @@ https://github.com/majidghafouri/goldenV2
 
 - The App is provided for educational purposes. Users are responsible for complying with local laws and regulations regarding proxy/VPN usage.
 - Yandex AppMetrica and Yandex Mobile Ads are services of Yandex, governed by their respective terms (linked above).
+- Google AdMob is a service of Google LLC, governed by the [Google Privacy & Terms](https://policies.google.com/privacy) and the [AdMob & AdSense policies](https://support.google.com/admob/answer/6128543).
