@@ -1,10 +1,9 @@
 package com.goldenv2.app
 
-import android.content.Intent
-import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -43,8 +42,17 @@ class MainActivity : ComponentActivity() {
     private val settingsViewModel: SettingsViewModel by viewModels()
     private val logsViewModel: LogsViewModel by viewModels()
 
-    private val VPN_PERMISSION_REQUEST_CODE = 1001
     private var vpnDialogPending = false
+
+    private val vpnPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            vpnDialogPending = false
+            if (result.resultCode == RESULT_OK) {
+                homeViewModel.onVpnPermissionGranted()
+            } else {
+                homeViewModel.onVpnPermissionDenied()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,31 +118,15 @@ class MainActivity : ComponentActivity() {
     private fun collectVpnPermissionRequests() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                homeViewModel.vpnPermissionRequest.collect { requestVpnPermission() }
+                // MainActivity is the only collector: it owns the result callback
+                // for this dialog. Collecting it in the composable as well would
+                // race with that and open two system dialogs.
+                homeViewModel.vpnPermissionRequest.collect { intent ->
+                    if (vpnDialogPending) return@collect
+                    vpnDialogPending = true
+                    vpnPermissionLauncher.launch(intent)
+                }
             }
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == VPN_PERMISSION_REQUEST_CODE) {
-            vpnDialogPending = false
-            if (resultCode == RESULT_OK) {
-                homeViewModel.onVpnPermissionGranted()
-            } else {
-                homeViewModel.onVpnPermissionDenied()
-            }
-        }
-    }
-
-    fun requestVpnPermission() {
-        if (vpnDialogPending) return
-        val intent = VpnService.prepare(this)
-        if (intent != null) {
-            vpnDialogPending = true
-            startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE)
-        } else {
-            homeViewModel.onVpnPermissionGranted()
         }
     }
 }

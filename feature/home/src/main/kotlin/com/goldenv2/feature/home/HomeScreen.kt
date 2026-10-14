@@ -99,17 +99,9 @@ fun HomeScreen(
     // Ad network currently serving ads (AdMob, or Yandex when AdMob is unavailable)
     val adProvider by adsManager.activeProvider.collectAsState()
 
-    // Handle VPN permission request from ViewModel
-    LaunchedEffect(viewModel.vpnPermissionRequest) {
-        viewModel.vpnPermissionRequest.collect { intent ->
-            intent?.let {
-                context.startActivity(it)
-                // Reset to avoid re-launching on recomposition
-                viewModel.onVpnPermissionHandled()
-            }
-        }
-    }
-
+    // The VPN permission dialog is launched by MainActivity, which owns the
+    // startActivityForResult callback. Collecting it here as well would race
+    // with that and open two system dialogs.
     // Pick and initialize the ad network as early as possible
     LaunchedEffect(Unit) {
         adsManager.initialize(context)
