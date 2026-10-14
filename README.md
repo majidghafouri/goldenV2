@@ -85,7 +85,7 @@ v2rayNG provides a pre-built wrapper. See their [releases](https://github.com/2d
 2. App calls `VpnService.prepare(context)` 
 3. System shows VPN permission dialog
 4. User grants permission
-5. App starts `VpnServiceImpl` foreground service
+5. App starts `VpnServiceImpl` (a `VpnService`, not a foreground service)
 6. Service establishes TUN interface and starts Xray
 
 ### Manifest Requirements
@@ -95,20 +95,23 @@ The following permissions and components are declared in `core/vpn/src/main/Andr
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
 <service
     android:name=".service.VpnServiceImpl"
     android:permission="android.permission.BIND_VPN_SERVICE"
-    android:exported="true"
-    android:foregroundServiceType="specialUse">
+    android:exported="true">
     <intent-filter>
         <action android:name="android.net.VpnService" />
     </intent-filter>
 </service>
+```
 
+No `FOREGROUND_SERVICE` permission and no `foregroundServiceType` are declared. The service
+does not call `startForeground()`: it establishes a TUN device and posts a standard
+`NotificationManager` notification, which Android shows for the lifetime of a `VpnService`.
+Declaring a foreground-service type here is unnecessary and would require the matching
+permission plus a Play `specialUse` justification.
 <receiver
     android:name=".receiver.BootReceiver"
     android:enabled="true"
@@ -204,31 +207,75 @@ Stored in `SettingsDataStore` with keys:
 ./gradlew :core:domain:test
 ```
 
-## Ads & Analytics (Yandex)
+## Ads & Analytics
 
-The app integrates Yandex Mobile Ads (banner on Home, interstitial before each
-connect) and AppMetrica (users, retention, crashes, ad revenue). Ad unit IDs
-and API keys are read from `local.properties` (gitignored) at build time:
+The app shows a banner on Home and an interstitial before each connect. Ad
+networks are abstracted behind an `AdProvider` interface in
+`feature/home/.../ads/`, and `AdsManager` picks the first one that can actually
+serve:
+
+1. **Google AdMob** (primary) — skipped when it is not configured, when the
+   device has no Google Play Services, or when it stops filling
+2. **Yandex Mobile Ads** (fallback) — works on every device
+3. **`NoAdsProvider`** — no ads; the app stays fully usable
+
+`AdsManager` never blocks the VPN connect flow: if no ad is ready, or loading or
+showing fails, the connect proceeds immediately.
+
+### Configuration
+
+Keys are read from `local.properties` (gitignored) at build time:
 
 ```properties
 # local.properties
+ADMOB_ENABLED=true
+ADMOB_APP_ID=ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+ADMOB_BANNER_AD_UNIT_ID=ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY
+ADMOB_INTERSTITIAL_AD_UNIT_ID=ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY
+ADMOB_TEST_DEVICE_IDS=                     # optional, debug builds only
+
 YANDEX_BANNER_AD_UNIT_ID=R-M-XXXXXXX_Y
 YANDEX_INTERSTITIAL_AD_UNIT_ID=R-M-XXXXXXX_I
 APPMETRICA_API_KEY=<your AppMetrica API key>
 ```
 
-Without these keys, debug builds fall back to the public Yandex demo ad unit
-IDs, so the repo stays buildable out of the box.
+The AdMob App ID is injected into the manifest as `${admobAppId}`, defaulting to
+Google's public sample ID when `ADMOB_APP_ID` is empty. Since AdMob is reported
+as unavailable in that case, the sample ID is never used to serve ads.
+
+Without any Yandex keys, debug builds fall back to the public Yandex demo ad
+unit IDs, so the repo stays buildable out of the box.
+
+### How the fallback works
+
+- **Not configured** — `ADMOB_APP_ID` or `ADMOB_INTERSTITIAL_AD_UNIT_ID` is blank, or
+  `ADMOB_ENABLED=false`. The interstitial is the primary placement and decides whether AdMob
+  is usable; `ADMOB_BANNER_AD_UNIT_ID` is optional, and until it exists the Home banner is
+  simply not rendered while interstitials keep serving.
+- **No Play Services** — `AdmobAdProvider.isAvailable()` checks
+  `GoogleApiAvailability.isGooglePlayServicesAvailable()`. AdMob cannot fill
+  without Play Services, so this is what covers devices in markets where GMS is
+  absent.
+- **No fill** — `AdFrequencyManager` aside, the active network reports failed
+  interstitial loads; after `MAX_CONSECUTIVE_LOAD_FAILURES` (3) `AdsManager`
+  demotes it to the next network. Banner no-fill is ignored, since it is common
+  and does not affect the interstitial.
 
 ### User Consent & Privacy
 
 On first launch the app shows a data-processing consent dialog (required for
-EEA users). The answer is persisted in SharedPreferences and wired to both SDKs:
+EEA users). The answer is persisted in SharedPreferences and wired to every SDK:
 
+- **Google AdMob**: `RequestConfiguration.setPublisherPrivacyPersonalizationState()`
+  — declined = `DISABLED`, which opts every request out of personalized ads
+  (ads still serve either way). This is AdMob's non-personalized-ads opt-out.
 - **Yandex Mobile Ads**: `YandexAds.setUserConsent()` — granted = personalized
-  ads, declined = non-personalized/contextual ads (ads still serve either way)
+  ads, declined = non-personalized/contextual ads
 - **AppMetrica**: `setDataSendingEnabled()` — data is **not sent at all** until
   the user accepts. A fresh install starts in a fully opt-out state.
+
+`ConsentManager` holds no ad SDK types, so it can be injected from `:app` without
+pulling an ad SDK into the application module.
 
 The `com.google.android.gms.permission.AD_ID` permission (declared in the app
 manifest) lets the ad SDK access the advertising ID on Android 13+.
