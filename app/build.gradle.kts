@@ -26,6 +26,9 @@ val localProperties = Properties().apply {
     }
 }
 
+/** Google's public sample AdMob app ID, used when ADMOB_APP_ID is not configured. */
+val GOOGLE_SAMPLE_ADMOB_APP_ID = "ca-app-pub-3940256099942544~3347511713"
+
 android {
     namespace = "com.goldenv2.app"
     compileSdk = 36
@@ -45,6 +48,12 @@ android {
             "APPMETRICA_API_KEY",
             "\"${localProperties.getProperty("APPMETRICA_API_KEY", "test")}\""
         )
+
+        // Google Mobile Ads (AdMob) reads the app ID from the manifest. When it is not
+        // configured the placeholder falls back to Google's public sample ID, which is
+        // never used because AdmobAdProvider reports AdMob as unavailable.
+        manifestPlaceholders["admobAppId"] =
+            localProperties.getProperty("ADMOB_APP_ID", GOOGLE_SAMPLE_ADMOB_APP_ID)
     }
 
     signingConfigs {

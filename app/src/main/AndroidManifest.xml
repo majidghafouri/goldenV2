@@ -23,6 +23,11 @@
         android:theme="@style/Theme.GoldenV2"
         tools:targetApi="31">
 
+        <!-- Google Mobile Ads (AdMob): app ID injected from local.properties -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
         <!-- AppMetrica Push: default notification icon -->
         <meta-data
             android:name="io.appmetrica.analytics.push.default_notification_icon"

@@ -31,6 +31,9 @@ accompanist = "0.32.0"
 firebaseMessaging = "24.1.2"
 ktx = "1.12.0"
 apacheSshd = "2.10.0"
+# Pinned to the 24.x line: 25.x is compiled against Kotlin 2.3 metadata and cannot
+# be consumed by this project's Kotlin 2.0.0 compiler.
+googleMobileAds = "24.5.0"
 yandexMobileAds = "8.4.0"
 appmetrica = "8.5.1"
 appmetricaPush = "4.3.0"
@@ -113,7 +116,10 @@ accompanist-systemuicontroller = { group = "com.google.accompanist", name = "acc
 # SSH client (MINA SSHD) - dynamic port forwarding (SOCKS) for SSH servers
 sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "apacheSshd" }
 
-# Yandex Mobile Ads SDK
+# Google Mobile Ads (AdMob) SDK - primary ad network
+google-mobileads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "googleMobileAds" }
+
+# Yandex Mobile Ads SDK - fallback ad network
 yandex-mobileads = { group = "com.yandex.android", name = "mobileads", version.ref = "yandexMobileAds" }
 yandex-mobileads-compose = { group = "com.yandex.android", name = "mobileads-compose", version.ref = "yandexMobileAds" }
 

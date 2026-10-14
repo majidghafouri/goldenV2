@@ -12,18 +12,38 @@ import java.util.Properties
 
 // Ad unit IDs live in local.properties (gitignored) to keep them out of the public repo.
 // Debug builds fall back to Yandex demo IDs so the public repo stays buildable.
+// AdMob is the primary network; when it is not configured or the device has no Google Play
+// Services, AdsManager falls back to Yandex Mobile Ads.
 val localProperties = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) load(FileInputStream(f))
 }
 
+val admobEnabled = localProperties.getProperty("ADMOB_ENABLED", "true")
+val admobAppId = localProperties.getProperty("ADMOB_APP_ID", "")
+val admobInterstitial = localProperties.getProperty("ADMOB_INTERSTITIAL_AD_UNIT_ID", "")
+val admobBanner = localProperties.getProperty("ADMOB_BANNER_AD_UNIT_ID", "")
+
 android {
     namespace = "com.goldenv2.feature.home"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
+
+        // AdMob (Google Mobile Ads). Blank IDs keep AdMob disabled so the app uses Yandex.
+        buildConfigField("boolean", "ADMOB_ENABLED", admobEnabled)
+        buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
+        buildConfigField("String", "ADMOB_INTERSTITIAL_AD_UNIT_ID", "\"$admobInterstitial\"")
+        buildConfigField("String", "ADMOB_BANNER_AD_UNIT_ID", "\"$admobBanner\"")
+        buildConfigField(
+            "String",
+            "ADMOB_TEST_DEVICE_IDS",
+            "\"${localProperties.getProperty("ADMOB_TEST_DEVICE_IDS", "")}\""
+        )
+
+        // Yandex Mobile Ads (fallback network).
         buildConfigField(
             "String",
             "YANDEX_INTERSTITIAL_AD_UNIT_ID",
@@ -39,6 +59,11 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        // AdsManager logs through android.util.Log, which is stubbed in unit tests.
+        unitTests.isReturnDefaultValues = true
     }
 
     compileOptions {
@@ -82,12 +107,14 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hilt.navigation.compose)
 
-    // Yandex Mobile Ads
+    // Ad networks: AdMob primary, Yandex Mobile Ads as fallback
+    implementation(libs.google.mobileads)
     implementation(libs.yandex.mobileads)
     implementation(libs.yandex.mobileads.compose)
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.mockito)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
 }
