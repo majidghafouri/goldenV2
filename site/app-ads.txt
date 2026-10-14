@@ -1,0 +1,18 @@
+# app-ads.txt for GoldenV2 (com.goldenv2.app)
+#
+# Publish this file at the ROOT of the developer website, i.e. it must be
+# reachable at https://<your-domain>/app-ads.txt
+#
+# The developer website must also be listed in the Play Console under
+# Grow users -> Store presence -> Store settings -> Store listing contact
+# details -> Developer website URL. AdMob crawls the hostname of that URL.
+#
+# REPLACE the line below with the personalized snippet from AdMob:
+#   Apps -> View all apps -> app-ads.txt -> "How to set up app-ads.txt"
+# The snippet carries this publisher's own account ID, so it cannot be
+# written by hand. Do not guess it - a wrong ID simply fails verification.
+google.com, pub-REPLACE_WITH_YOUR_PUBLISHER_ID, DIRECT
+
+# GoldenV2 also monetizes through Yandex Mobile Ads (fallback network).
+# Add Yandex's seller ID here as well once you obtain it from Yandex:
+#   yandex.com, pub-XXXXXXXX, DIRECT, f08c47fec0942fa0
