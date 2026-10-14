@@ -3,68 +3,106 @@ package com.goldenv2.feature.home.ads
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import com.goldenv2.feature.home.BuildConfig
-import com.yandex.mobile.ads.common.AdError
-import com.yandex.mobile.ads.common.AdRequest
-import com.yandex.mobile.ads.common.AdRequestError
-import com.yandex.mobile.ads.common.ImpressionData
-import com.yandex.mobile.ads.common.YandexAds
-import com.yandex.mobile.ads.interstitial.InterstitialAd
-import com.yandex.mobile.ads.interstitial.InterstitialAdEventListener
-import com.yandex.mobile.ads.interstitial.InterstitialAdLoadListener
-import com.yandex.mobile.ads.interstitial.InterstitialAdLoader
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Singleton
 
 /**
- * Preloads a Yandex interstitial ad and shows it when the user presses Connect.
+ * Picks the ad network to use and forwards ad requests to it.
  *
- * The VPN connection itself must never be blocked on the ad: if the ad is not
- * ready, fails to load or fails to show, [showAdOrProceed] invokes [onProceed]
- * immediately so the connect flow continues uninterrupted.
+ * AdMob (Google Mobile Ads) is preferred. It is skipped and [YandexAdProvider]
+ * takes over when AdMob is not configured, when the device has no Google Play
+ * Services, or when AdMob repeatedly fails to fill. When no network is usable
+ * the app falls back to [NoAdsProvider] and simply shows no ads.
+ *
+ * The VPN connection itself is never blocked on an ad: if no ad is ready, or
+ * loading/showing fails, [showAdOrProceed] invokes `onProceed` immediately so
+ * the connect flow continues uninterrupted.
  */
 @Singleton
-class AdsManager @Inject constructor(
-    private val consentManager: ConsentManager
+class AdsManager internal constructor(
+    /** Reads the persisted consent at the moment a network is selected. */
+    private val isPersonalizationAllowed: () -> Boolean,
+    /** Ad networks in fallback order. */
+    private val providers: List<AdProvider>
 ) {
 
-    private var interstitialAdLoader: InterstitialAdLoader? = null
-    private var interstitialAd: InterstitialAd? = null
-    private val loading = AtomicBoolean(false)
+    constructor(
+        consentManager: ConsentManager,
+        providers: List<AdProvider>
+    ) : this({ consentManager.isPersonalizationAllowed }, providers)
 
+    private val _activeProvider = MutableStateFlow<AdProvider>(NoAdsProvider)
+
+    /** Network currently serving ads, or [NoAdsProvider] while none is ready. */
+    val activeProvider: StateFlow<AdProvider> = _activeProvider.asStateFlow()
+
+    /** Index into [providers] of the network being initialized, or -1 for none. */
     @Volatile
-    private var sdkInitialized = false
+    private var activeIndex = -1
 
+    private val started = AtomicBoolean(false)
+    private val consecutiveLoadFailures = AtomicInteger(0)
+
+    /** Initializes the preferred available network. Safe to call more than once. */
     fun initialize(context: Context) {
-        if (sdkInitialized) return
-        sdkInitialized = true
-        // Apply persisted consent before loading any ads.
-        YandexAds.setUserConsent(consentManager.isPersonalizationAllowed)
-        YandexAds.initialize(context) {
-            Log.d(TAG, "Yandex Mobile Ads SDK initialized")
-            preloadInterstitial(context.applicationContext)
-        }
+        if (!started.compareAndSet(false, true)) return
+        activate(context.applicationContext, 0)
     }
 
-    fun preloadInterstitial(context: Context) {
-        if (interstitialAd != null || !loading.compareAndSet(false, true)) return
-        val loader = interstitialAdLoader ?: InterstitialAdLoader(context.applicationContext).also {
-            interstitialAdLoader = it
+    /**
+     * Selects the first available network at or after [from] and initializes it.
+     * Availability is re-checked on every attempt, so a network demoted mid-session
+     * cannot be re-selected.
+     */
+    private fun activate(context: Context, from: Int) {
+        val provider = providers.getOrNull(from)
+        if (provider == null) {
+            Log.w(TAG, "No ad network available")
+            _activeProvider.value = NoAdsProvider
+            return
         }
-        val request = AdRequest.Builder(INTERSTITIAL_AD_UNIT_ID).build()
-        loader.loadAd(request, object : InterstitialAdLoadListener {
-            override fun onAdLoaded(ad: InterstitialAd) {
-                loading.set(false)
-                interstitialAd = ad
-                Log.d(TAG, "Interstitial ad loaded")
-            }
+        if (!provider.isAvailable(context)) {
+            Log.i(TAG, "${provider.network} unavailable, falling back")
+            activate(context, from + 1)
+            return
+        }
+        activeIndex = from
+        provider.setPersonalized(isPersonalizationAllowed())
+        provider.initialize(
+            context = context,
+            onReady = {
+                Log.i(TAG, "Ad network active: ${provider.network}")
+                consecutiveLoadFailures.set(0)
+                _activeProvider.value = provider
+            },
+            onLoadFailed = { onLoadFailed(context) }
+        )
+    }
 
-            override fun onAdFailedToLoad(error: AdRequestError) {
-                loading.set(false)
-                Log.w(TAG, "Interstitial ad failed to load: ${error.code} ${error.description}")
-            }
-        })
+    /**
+     * Counts load failures for the active network and demotes it to the next
+     * fallback once it stops filling, so the app keeps earning revenue.
+     */
+    private fun onLoadFailed(context: Context) {
+        val failures = consecutiveLoadFailures.incrementAndGet()
+        if (failures < MAX_CONSECUTIVE_LOAD_FAILURES) {
+            Log.i(TAG, "Ad load failed ($failures/$MAX_CONSECUTIVE_LOAD_FAILURES)")
+            return
+        }
+        val next = activeIndex + 1
+        if (next >= providers.size) {
+            Log.w(TAG, "No fallback ad network left, keeping current provider")
+            consecutiveLoadFailures.set(0)
+            return
+        }
+        Log.w(TAG, "Ad network stopped filling, falling back")
+        consecutiveLoadFailures.set(0)
+        _activeProvider.value = NoAdsProvider
+        activate(context, next)
     }
 
     /**
@@ -73,40 +111,21 @@ class AdsManager @Inject constructor(
      * Must be called from the main thread with a foreground [activity].
      */
     fun showAdOrProceed(activity: Activity, onProceed: () -> Unit) {
-        val ad = interstitialAd
-        if (ad == null) {
-            preloadInterstitial(activity.applicationContext)
-            onProceed()
-            return
-        }
-        interstitialAd = null
-        ad.setAdEventListener(object : InterstitialAdEventListener {
-            override fun onAdShown() {
-                Log.d(TAG, "Interstitial ad shown")
-            }
+        _activeProvider.value.showInterstitial(activity, onProceed)
+    }
 
-            override fun onAdFailedToShow(adError: AdError) {
-                Log.w(TAG, "Interstitial ad failed to show: ${adError.description}")
-                ad.setAdEventListener(null)
-                preloadInterstitial(activity.applicationContext)
-                onProceed()
-            }
-
-            override fun onAdDismissed() {
-                ad.setAdEventListener(null)
-                preloadInterstitial(activity.applicationContext)
-                onProceed()
-            }
-
-            override fun onAdClicked() = Unit
-
-            override fun onAdImpression(impressionData: ImpressionData?) = Unit
-        })
-        ad.show(activity)
+    /**
+     * Re-applies consent after the user changed their answer. Forwarded to every
+     * provider so a network selected later starts from the current answer.
+     */
+    fun onConsentChanged(granted: Boolean) {
+        providers.forEach { it.setPersonalized(granted) }
     }
 
     private companion object {
         private const val TAG = "AdsManager"
-        private val INTERSTITIAL_AD_UNIT_ID = BuildConfig.YANDEX_INTERSTITIAL_AD_UNIT_ID
+
+        /** Consecutive load failures before falling back to the next network. */
+        private const val MAX_CONSECUTIVE_LOAD_FAILURES = 3
     }
 }

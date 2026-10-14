@@ -1,7 +1,6 @@
 package com.goldenv2.feature.home.ads
 
 import android.content.Context
-import com.yandex.mobile.ads.common.YandexAds
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,10 +8,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Persists the user's data-processing consent and propagates it to the
- * Yandex Mobile Ads SDK. AppMetrica is updated by [com.goldenv2.app.GoldenV2Application],
- * which collects [personalizationConsent] and calls
- * `AppMetrica.setDataSendingEnabled` accordingly.
+ * Persists the user's data-processing consent and exposes it to the ad networks
+ * through [AdsManager], which forwards it to the active [AdProvider].
+ * AppMetrica is updated by [com.goldenv2.app.GoldenV2Application], which collects
+ * [personalizationConsent] and calls `AppMetrica.setDataSendingEnabled` accordingly.
+ *
+ * This class is deliberately free of ad SDK types so it can be injected from
+ * `:app` without pulling an ad SDK into the application module.
  *
  * Consent is stored synchronously (SharedPreferences) because it is needed in
  * `Application.onCreate()` before AppMetrica is activated.
@@ -37,7 +39,6 @@ class ConsentManager @Inject constructor(
     fun setPersonalizationConsent(granted: Boolean) {
         prefs.edit().putBoolean(KEY_CONSENT, granted).apply()
         _personalizationConsent.value = granted
-        YandexAds.setUserConsent(granted)
     }
 
     private companion object {
