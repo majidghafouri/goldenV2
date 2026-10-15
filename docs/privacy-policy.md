@@ -42,17 +42,32 @@ Data is collected by Yandex AppMetrica and processed under the [Yandex AppMetric
 
 **2. Advertising — Google AdMob and/or Yandex Mobile Ads**
 
-- The App shows banner ads on the Home screen and an interstitial ad before connecting
-- With consent, ads may be personalized using advertising identifiers and collected usage data
-- Ad networks and their partners use advertising identifiers (e.g., Google Advertising ID, if available on your device) for ad delivery and frequency capping
-- Ad revenue attribution and ad interaction events are reported to AppMetrica
-- Google: processing is described in the [Google Privacy & Terms](https://policies.google.com/technologies/partner-sites) and the [Google Ads data disclosure](https://policies.google.com/ads)
-- Yandex: processing is described in the [Yandex Mobile Ads Terms and privacy documentation](https://yandex.com/legal/mobileads_agreement/)
+The App shows banner ads on the Home screen and an interstitial ad before connecting. Advertising is
+served by **Google AdMob**, or by **Yandex Mobile Ads** on devices where AdMob cannot serve (for
+example, devices without Google Play Services). Only one network is active at a time, and each
+ad request is made with the personalization state that both your in-app answer and the Google CMP
+allow.
+
+For users in the EEA, UK and Switzerland, Google's User Messaging Platform presents a consent form
+that records your choice under the IAB TCF standard before personalised ads are served. See
+[Your Rights and Choices](#your-rights-and-choices) below.
+
+With consent, ads may be personalized using advertising identifiers and collected usage data.
+Ad networks and their partners use advertising identifiers (e.g., Google Advertising ID, if available
+on your device) for ad delivery and frequency capping. Ad revenue attribution and ad interaction
+events are reported to AppMetrica.
+
+- Google: [Google Privacy & Terms](https://policies.google.com/privacy) and the
+  [Google Ads data disclosure](https://developers.google.com/ad-manager/mobile-ads-sdk/android/privacy/play-data-disclosure)
+- Yandex: [Yandex Mobile Ads Terms and privacy documentation](https://yandex.com/legal/mobileads_agreement/)
 
 ### If you DECLINE
 
 - **No analytics data is sent** to AppMetrica (data sending is fully disabled)
-- Ads continue to be shown but are **non-personalized (contextual)**: AdMob receives an explicit request to opt out of personalized ads, and Yandex Mobile Ads is set to non-personalized
+- Ads continue to be shown but are **non-personalized (contextual)**. Every ad request is made
+  without personalization because your in-app answer and the Google CMP must *both* allow it -
+  if either withholds consent, ads are requested without personalization. This applies whichever
+  network ends up serving the ad.
 - Advertising identifiers are not used for personalization
 
 Declining does not restrict any VPN feature.
@@ -90,6 +105,14 @@ The App connects to **proxy servers that you configure**. Your traffic, includin
 ## Your Rights and Choices
 
 - **Consent**: You can review the consent dialog by clearing the App's data or reinstalling. All analytics and personalized advertising is disabled unless you accept.
+- **Change your consent at any time**: Settings → **Privacy** → **Privacy choices** opens Google's
+  consent form, where you can review or withdraw your decision. Consent can never be revoked by
+  uninstalling the App alone, so this entry point is always available.
+- **Google consent form (CMP)**: for users in the EEA, UK and Switzerland, Google requires that
+  consent for personalised advertising be collected through an IAB TCF-certified consent management
+  platform. GoldenV2 uses Google's User Messaging Platform (UMP), which presents that form at first
+  launch and records your choice. Google acts as the consent platform provider and processes your
+  consent string for this purpose under the [Google Privacy & Terms](https://policies.google.com/privacy).
 - **Delete data**: Uninstalling the App removes all local data. To exercise data deletion rights for analytics data collected by Yandex, refer to [Yandex's privacy documentation](https://yandex.com/legal/confidential/). For Google, use [Google's Ads Settings](https://adssettings.google.com/) and [My Activity](https://myaccount.google.com/data-and-privacy).
 - **Opt out of ad personalization**: You can also reset or delete your Advertising ID in your device Settings (Settings > Privacy > Ads).
 
