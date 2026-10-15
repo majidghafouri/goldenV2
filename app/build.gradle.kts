@@ -159,6 +159,11 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // WorkManager with Hilt-injected workers (subscription auto-refresh)
+    implementation(libs.workmanager.runtime)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.ext.compiler)
+
     // Accompanist
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.systemuicontroller)

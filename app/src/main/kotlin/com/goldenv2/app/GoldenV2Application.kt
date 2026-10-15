@@ -1,6 +1,8 @@
 package com.goldenv2.app
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import com.goldenv2.feature.home.ads.ConsentManager
 import dagger.hilt.android.HiltAndroidApp
 import io.appmetrica.analytics.AppMetrica
@@ -13,16 +15,21 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 @HiltAndroidApp
-class GoldenV2Application : Application() {
+class GoldenV2Application : Application(), Configuration.Provider {
 
     @Inject
     lateinit var consentManager: ConsentManager
+
+    /** Required so Hilt-injected workers, such as SubscriptionRefreshWorker, can be created. */
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         initAppMetrica()
+        SubscriptionRefreshWorker.schedule(this)
     }
 
     private fun initAppMetrica() {
@@ -71,4 +78,9 @@ class GoldenV2Application : Application() {
     private companion object {
         private const val TAG = "GoldenV2App"
     }
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 }

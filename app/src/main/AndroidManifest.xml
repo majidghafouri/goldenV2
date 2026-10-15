@@ -45,6 +45,20 @@
             </intent-filter>
         </activity>
 
+        <!-- GoldenV2Application implements Configuration.Provider so Hilt-injected workers can be
+             used, which means WorkManager must be initialised on demand instead of by the
+             default startup provider. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
