@@ -2,6 +2,7 @@ package com.goldenv2.core.network.di
 
 import com.goldenv2.core.network.SubscriptionApi
 import com.goldenv2.core.network.SubscriptionFetcher
+import com.goldenv2.core.network.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,12 +22,17 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
-        return OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
+        val builder = OkHttpClient.Builder()
+        // Subscription bodies contain every server credential. Never log them: at BODY
+        // level they land in logcat, which any app with READ_LOGS or an adb shell can
+        // read. BASIC is request-line only, and it is debug-only regardless.
+        if (!BuildConfig.DEBUG) return builder.build()
+        builder.addInterceptor(
+            HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            }
+        )
+        return builder.build()
     }
 
     @Provides

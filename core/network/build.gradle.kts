@@ -15,6 +15,12 @@ android {
         targetSdk = 35
     }
 
+    buildFeatures {
+        // Lets NetworkModule branch on BuildConfig.DEBUG so request logging is never
+        // compiled into a release build.
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
