@@ -34,6 +34,8 @@ apacheSshd = "2.10.0"
 # Pinned to the 24.x line: 25.x is compiled against Kotlin 2.3 metadata and cannot
 # be consumed by this project's Kotlin 2.0.0 compiler.
 googleMobileAds = "24.5.0"
+# Google User Messaging Platform (UMP) - IAB TCF certified CMP for EEA/UK/CH
+userMessagingPlatform = "4.0.0"
 yandexMobileAds = "8.4.0"
 appmetrica = "8.5.1"
 appmetricaPush = "4.3.0"
@@ -118,6 +120,9 @@ sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "apac
 
 # Google Mobile Ads (AdMob) SDK - primary ad network
 google-mobileads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "googleMobileAds" }
+
+# Google User Messaging Platform (UMP) - consent form for EEA/UK/Switzerland
+user-messaging-platform = { group = "com.google.android.ump", name = "user-messaging-platform", version.ref = "userMessagingPlatform" }
 
 # Yandex Mobile Ads SDK - fallback ad network
 yandex-mobileads = { group = "com.yandex.android", name = "mobileads", version.ref = "yandexMobileAds" }

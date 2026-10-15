@@ -169,6 +169,10 @@ dependencies {
     // Material Design (for XML themes)
     implementation(libs.material)
 
+    // Google User Messaging Platform: IAB TCF certified consent form.
+    // Required by Google's EU User Consent Policy for EEA, UK and Swiss traffic.
+    implementation(libs.user.messaging.platform)
+
     // AppMetrica (users, retention, crashes, ad revenue)
     implementation(libs.appmetrica)
 
