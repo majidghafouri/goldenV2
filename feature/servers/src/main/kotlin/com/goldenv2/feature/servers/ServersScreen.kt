@@ -1,8 +1,10 @@
 package com.goldenv2.feature.servers
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -15,6 +17,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +51,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.QrCode
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.common.BitMatrix
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -83,6 +92,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -126,6 +136,18 @@ fun ServersScreen(
     // Context menu state
     val contextMenuServer = uiState.contextMenuServer
     val showContextMenu = uiState.showServerContextMenu
+
+    // Clipboard access needs a Context, so the ViewModel signals the intent and this
+    // effect performs the copy.
+    val clipboardContext = LocalContext.current
+    val exportTarget = uiState.subscriptionLinkToExport
+    LaunchedEffect(exportTarget) {
+        exportTarget?.let { subscription ->
+            val clipboard = clipboardContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Subscription URL", subscription.url))
+            viewModel.onSubscriptionLinkCopied()
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -226,20 +248,21 @@ fun ServersScreen(
                     }
                     uiState.subscriptions.forEach { subscription ->
                         val servers = uiState.groupedServers[subscription] ?: emptyList()
-                        if (servers.isNotEmpty() || subscription.isEnabled) {
-                            item(key = subscription.id) {
-                                SubscriptionSection(
-                                    subscription = subscription,
-                                    servers = servers,
-                                    onRefresh = { viewModel.onRefreshSubscription(subscription) },
-                                    onToggleEnabled = { viewModel.onToggleSubscriptionEnabled(subscription) },
-                                    onDelete = { viewModel.onDeleteSubscription(subscription) },
-                                    onServerClick = { server -> viewModel.onSelectServer(server) },
-                                    onTestLatency = { server -> viewModel.onTestLatency(server) },
-                                    onDeleteServer = { server -> viewModel.onDeleteServer(server) },
-                                    onShowContextMenu = { server -> viewModel.onShowContextMenu(server) }
-                                )
-                            }
+                        // Always rendered: a subscription with no servers and no
+                        // fill is exactly the one the user needs to see in order to
+                        // fix it. Hiding it made it impossible to refresh or remove.
+                        item(key = subscription.id) {
+                            SubscriptionSection(
+                                subscription = subscription,
+                                servers = servers,
+                                onRefresh = { viewModel.onRefreshSubscription(subscription) },
+                                onToggleEnabled = { viewModel.onToggleSubscriptionEnabled(subscription) },
+                                onShowSubscriptionMenu = { sub -> viewModel.onShowSubscriptionMenu(sub) },
+                                onServerClick = { server -> viewModel.onSelectServer(server) },
+                                onTestLatency = { server -> viewModel.onTestLatency(server) },
+                                onDeleteServer = { server -> viewModel.onDeleteServer(server) },
+                                onShowContextMenu = { server -> viewModel.onShowContextMenu(server) }
+                            )
                         }
                     }
                 }
@@ -265,6 +288,36 @@ fun ServersScreen(
             onDuplicate = { viewModel.onDuplicateServer(contextMenuServer!!); viewModel.onDismissContextMenu() },
             onDelete = { viewModel.onDeleteServer(contextMenuServer!!); viewModel.onDismissContextMenu() }
         )
+    }
+
+    uiState.contextMenuSubscription?.let { subscription ->
+        if (uiState.showSubscriptionContextMenu) {
+            SubscriptionContextMenu(
+                subscription = subscription,
+                onDismiss = viewModel::onDismissSubscriptionMenu,
+                onPin = { viewModel.onPinSubscription(subscription) },
+                onRefresh = { viewModel.onRefreshSubscription(subscription) },
+                onEdit = { viewModel.onEditSubscription(subscription) },
+                onCopyLink = { viewModel.onCopySubscriptionUrl(subscription) },
+                onShowQr = { viewModel.onExportSubscriptionQr(subscription) },
+                onToggleEnabled = { viewModel.onToggleSubscriptionEnabled(subscription) },
+                onDelete = { viewModel.onDeleteSubscription(subscription) }
+            )
+        }
+    }
+
+    if (uiState.showEditSubscriptionDialog && uiState.editSubscription != null) {
+        EditSubscriptionDialog(
+            subscription = uiState.editSubscription!!,
+            onDismiss = viewModel::onDismissEditSubscriptionDialog,
+            onSave = viewModel::onUpdateSubscription
+        )
+    }
+
+    uiState.subscriptionQrPayload?.let { payload ->
+        if (uiState.showSubscriptionQr) {
+            SubscriptionQrDialog(payload = payload, onDismiss = viewModel::onDismissSubscriptionQr)
+        }
     }
 
     if (uiState.showAddServerSheet) {
@@ -1096,13 +1149,14 @@ private fun LocalServersSection(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SubscriptionSection(
     subscription: Subscription,
     servers: List<Server>,
     onRefresh: () -> Unit,
     onToggleEnabled: () -> Unit,
-    onDelete: () -> Unit,
+    onShowSubscriptionMenu: (Subscription) -> Unit,
     onServerClick: (Server) -> Unit,
     onTestLatency: (Server) -> Unit,
     onDeleteServer: (Server) -> Unit,
@@ -1111,7 +1165,8 @@ fun SubscriptionSection(
     var expanded by remember { mutableStateOf(true) }
 
     Column(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
-        // Subscription Header
+        // Long-press opens the subscription actions. A tap only expands/collapses, so
+        // destructive actions are never one stray tap away.
         Card(
             modifier = androidx.compose.ui.Modifier
                 .fillMaxWidth()
@@ -1124,48 +1179,65 @@ fun SubscriptionSection(
             Row(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = { expanded = !expanded },
+                        onLongClick = { onShowSubscriptionMenu(subscription) }
+                    )
+                    // weight(1f) lets the name wrap/shrink instead of pushing the
+                    // trailing icons out of the row, which clipped them before.
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Folder,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = androidx.compose.ui.Modifier.size(24.dp).padding(end = 12.dp)
+                Icon(
+                    imageVector = Icons.Filled.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp).padding(end = 12.dp)
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                ) {
+                    Text(
+                        text = subscription.name,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Column {
-                        Text(text = subscription.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            text = "${servers.size} servers • ${if (subscription.lastRefreshSuccess) "Updated" else "Failed"}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = buildString {
+                            if (subscription.isPinned) append("Pinned • ")
+                            append("${servers.size} servers")
+                            append(" • ")
+                            if (subscription.isEnabled) {
+                                append(if (subscription.lastRefreshSuccess) "Updated" else "Failed")
+                            } else {
+                                append("Disabled")
+                            }
+                        },
+                        fontSize = 12.sp,
+                        color = if (subscription.isEnabled) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        }
+                    )
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Switch(
-                        checked = subscription.isEnabled,
-                        onCheckedChange = { onToggleEnabled() },
-                        modifier = androidx.compose.ui.Modifier.padding(end = 8.dp)
-                    )
                     GoldenV2IconButton(
                         icon = Icons.Filled.Refresh,
                         contentDescription = "Refresh",
                         onClick = onRefresh
                     )
-                    GoldenV2IconButton(
-                        icon = Icons.Filled.Delete,
-                        contentDescription = "Delete",
-                        onClick = onDelete
-                    )
                     Icon(
                         imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = androidx.compose.ui.Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -1206,6 +1278,156 @@ fun SubscriptionSection(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Actions for a subscription, opened by long-pressing its header.
+ *
+ * Replaces the previous enable switch and inline delete button: both put a
+ * destructive or easily-mistapped control directly in the list row.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun SubscriptionContextMenu(
+    subscription: Subscription,
+    onDismiss: () -> Unit,
+    onPin: () -> Unit,
+    onRefresh: () -> Unit,
+    onEdit: () -> Unit,
+    onCopyLink: () -> Unit,
+    onShowQr: () -> Unit,
+    onToggleEnabled: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (subscription.isPinned) Icons.Filled.CheckCircle else Icons.Filled.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp).padding(end = 12.dp)
+                )
+                Column {
+                    Text(
+                        text = subscription.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${subscription.serverCount} servers",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                ListItem(
+                    headlineContent = {
+                        Text(if (subscription.isPinned) "Unpin" else "Pin to top")
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onPin() }
+                )
+                ListItem(
+                    headlineContent = { Text("Refresh now") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onRefresh() }
+                )
+                ListItem(
+                    headlineContent = { Text("Edit") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onEdit() }
+                )
+                ListItem(
+                    headlineContent = { Text("Copy link") },
+                    supportingContent = { Text(subscription.url, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onCopyLink() }
+                )
+                ListItem(
+                    headlineContent = { Text("Show as QR code") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.QrCodeScanner,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onShowQr() }
+                )
+                ListItem(
+                    headlineContent = {
+                        Text(if (subscription.isEnabled) "Disable" else "Enable")
+                    },
+                    supportingContent = {
+                        Text("Disabled subscriptions are skipped when refreshing all")
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onToggleEnabled() }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                ListItem(
+                    headlineContent = {
+                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                    },
+                    supportingContent = {
+                        Text(
+                            "Deletes this subscription and its ${subscription.serverCount} servers",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onDelete() }
+                )
             }
         }
     }
@@ -1423,3 +1645,113 @@ private fun getLatencyColor(latency: Long): Color {
         else -> Color.Red
     }
 }
+/**
+ * Edit a subscription's display name and link. Saving re-pulls the link, because the
+ * new URL may serve different servers than the old one.
+ */
+@Composable
+fun EditSubscriptionDialog(
+    subscription: Subscription,
+    onDismiss: () -> Unit,
+    onSave: (name: String, url: String) -> Unit
+) {
+    var name by remember { mutableStateOf(subscription.name) }
+    var url by remember { mutableStateOf(subscription.url) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit subscription") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("Subscription URL") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(name, url) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+/** Renders a subscription link as a QR code so it can be shared or imported elsewhere. */
+@Composable
+fun SubscriptionQrDialog(payload: String, onDismiss: () -> Unit) {
+    val matrix = remember(payload) {
+        runCatching {
+            QRCodeWriter().encode(
+                payload,
+                BarcodeFormat.QR_CODE,
+                640,
+                640,
+                mapOf(
+                    EncodeHintType.MARGIN to 1,
+                    EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M
+                )
+            )
+        }.getOrNull()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Subscription QR") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val image = remember(matrix) { matrix?.toBitmap()?.asImageBitmap() }
+                if (image != null) {
+                    Image(
+                        bitmap = image,
+                        contentDescription = "Subscription QR code",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                            MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                } else {
+                    Text(
+                        text = "This link is too long to encode as a QR code",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+private fun BitMatrix.toBitmap(): android.graphics.Bitmap? = runCatching {
+    val w = width
+    val h = height
+    val pixels = IntArray(w * h)
+    for (y in 0 until h) {
+        for (x in 0 until w) {
+            pixels[y * w + x] = if (this[x, y]) {
+                android.graphics.Color.BLACK
+            } else {
+                android.graphics.Color.WHITE
+            }
+        }
+    }
+    android.graphics.Bitmap.createBitmap(pixels, w, h, android.graphics.Bitmap.Config.RGB_565)
+}.getOrNull()
