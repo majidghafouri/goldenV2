@@ -30,15 +30,39 @@ class ConsentManager @Inject constructor(
         if (prefs.contains(KEY_CONSENT)) prefs.getBoolean(KEY_CONSENT, false) else null
     )
 
-    /** `null` until the user has answered the consent dialog. */
+    /**
+     * Whether Google's User Messaging Platform currently allows ad requests.
+     * Defaults to `true` so non-EEA users, where no CMP is required, are unaffected
+     * and the first ad request is not needlessly downgraded while UMP is still loading.
+     */
+    private val _umpAllowsAds = MutableStateFlow(true)
+
+    /** `null` until the user has answered the in-app consent dialog. */
     val personalizationConsent: StateFlow<Boolean?> = _personalizationConsent
 
-    val isPersonalizationAllowed: Boolean
+    /** The in-app consent answer on its own, ignoring the Google CMP. */
+    val isUserConsentGranted: Boolean
         get() = _personalizationConsent.value == true
+
+    /**
+     * Effective advertising consent: the in-app answer AND the Google CMP must both
+     * allow it. Using AND keeps the two sources from ever disagreeing in the app's
+     * favour - if either withholds consent, ads are requested non-personalized.
+     */
+    val isPersonalizationAllowed: Boolean
+        get() = isUserConsentGranted && _umpAllowsAds.value
 
     fun setPersonalizationConsent(granted: Boolean) {
         prefs.edit().putBoolean(KEY_CONSENT, granted).apply()
         _personalizationConsent.value = granted
+    }
+
+    /**
+     * Records whether the Google CMP currently permits ad requests. Called by
+     * [com.goldenv2.app.UmpConsentController] once the UMP status is known.
+     */
+    fun setUmpAllowsAds(allowed: Boolean) {
+        _umpAllowsAds.value = allowed
     }
 
     private companion object {
