@@ -42,6 +42,9 @@ class MainActivity : ComponentActivity() {
     private val settingsViewModel: SettingsViewModel by viewModels()
     private val logsViewModel: LogsViewModel by viewModels()
 
+    @Inject
+    lateinit var umpConsentController: UmpConsentController
+
     private var vpnDialogPending = false
 
     private val vpnPermissionLauncher =
@@ -57,6 +60,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         collectVpnPermissionRequests()
+        collectUmpConsent()
         setContent {
             GoldenV2Theme {
                 Surface(
@@ -97,7 +101,8 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToHome = { navController.navigate("home") },
                                 onNavigateToServers = { navController.navigate("servers") },
                                 onNavigateToRouting = { navController.navigate("routing") },
-                                onNavigateToLogs = { navController.navigate("logs") }
+                                onNavigateToLogs = { navController.navigate("logs") },
+                                onPrivacyChoicesClick = { showPrivacyOptions() }
                             )
                         }
                         composable("logs") {
@@ -113,6 +118,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Runs the Google CMP consent flow at launch. Required before any ad request so
+     * EEA, UK and Swiss users are served in line with their recorded consent.
+     */
+    private fun collectUmpConsent() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                umpConsentController.collectConsentIfRequired(this@MainActivity)
+            }
+        }
+    }
+
+    private fun showPrivacyOptions() {
+        umpConsentController.showPrivacyOptions(this)
     }
 
     private fun collectVpnPermissionRequests() {
