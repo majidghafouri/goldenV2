@@ -10,7 +10,20 @@ import javax.inject.Singleton
 class SubscriptionUseCase @Inject constructor(
     private val repository: SubscriptionRepository
 ) {
-    suspend fun addSubscription(subscription: Subscription) = repository.insert(subscription.copy(id = UUID.randomUUID().toString()))
+    /**
+     * Inserts [subscription] and returns the stored row.
+     *
+     * The returned value must be used for any follow-up write (for example recording a
+     * refresh result). The id is generated here rather than in the entity default so that
+     * the caller, the servers tagged with `subscriptionId`, and the row in the table all
+     * agree - Room matches [update] on the primary key, so passing the pre-insert object
+     * silently updates nothing and leaves the servers orphaned.
+     */
+    suspend fun addSubscription(subscription: Subscription): Subscription {
+        val stored = subscription.copy(id = UUID.randomUUID().toString())
+        repository.insert(stored)
+        return stored
+    }
 
     suspend fun updateSubscription(subscription: Subscription) = repository.update(subscription)
 
@@ -23,7 +36,11 @@ class SubscriptionUseCase @Inject constructor(
     fun getById(id: String): kotlinx.coroutines.flow.Flow<Subscription?> = repository.getById(id)
 
     suspend fun toggleEnabled(subscription: Subscription) =
-        repository.update(subscription.copy(isEnabled = !subscription.isEnabled))
+        repository.update(subscription.copyEnabled(!subscription.isEnabled))
+
+    /** Pins a subscription above the others, or unpins it. */
+    suspend fun togglePinned(subscription: Subscription) =
+        repository.update(subscription.copyPinned(!subscription.isPinned))
 
     suspend fun updateRefreshResult(
         subscription: Subscription,

@@ -162,14 +162,28 @@ class ServersViewModel @Inject constructor(
         onImportConfig(text)
     }
 
+    /**
+     * A single entry point for pasted, scanned or typed content.
+     *
+     * A bare http(s) URL is almost always a subscription, not a server config, so it is
+     * routed to the subscription flow. Previously both the clipboard and the QR scanner
+     * sent every input to the server-config parser, which reported "No valid server
+     * links found" for a perfectly good subscription link.
+     */
     fun onImportConfig(input: String) {
-        viewModelScope.launch {
-            if (input.isBlank()) {
-                setImportResult("Clipboard is empty", isError = true)
-                return@launch
-            }
+        val trimmed = input.trim()
+        if (trimmed.isBlank()) {
+            setImportResult("Nothing to import", isError = true)
+            return
+        }
 
-            val servers = parseSubscriptionContent(input)
+        if (ImportSourceDetector.isSubscriptionUrl(trimmed)) {
+            onAddSubscriptionUrl(trimmed)
+            return
+        }
+
+        viewModelScope.launch {
+            val servers = parseSubscriptionContent(trimmed)
             if (servers.isEmpty()) {
                 logUseCase.w("ServersViewModel", "No valid server links found in input")
                 setImportResult("No valid server links found in the input", isError = true)
@@ -181,7 +195,7 @@ class ServersViewModel @Inject constructor(
         }
     }
 
-    fun onAddSubscriptionUrl(url: String) {
+fun onAddSubscriptionUrl(url: String) {
         val trimmed = url.trim()
         if (trimmed.isEmpty() || !(trimmed.startsWith("http://") || trimmed.startsWith("https://"))) {
             setImportResult("Invalid subscription URL", isError = true)
@@ -195,11 +209,12 @@ class ServersViewModel @Inject constructor(
                 .getOrNull()
                 ?.takeIf { it.isNotBlank() }
                 ?: "Subscription"
-            val subscription = Subscription(url = trimmed, name = name)
-            subscriptionUseCase.addSubscription(subscription)
+            // Use the stored row so its id matches the subscriptionId stamped on the
+            // servers and so the refresh result is written to a row that exists.
+            val subscription = subscriptionUseCase.addSubscription(Subscription(url = trimmed, name = name))
             logUseCase.i("ServersViewModel", "Adding subscription: $name")
 
-            subscriptionFetcher.fetchAndParse(trimmed, subscription.id)
+            subscriptionFetcher.fetchAndParse(subscription.url, subscription.id)
                 .onSuccess { servers ->
                     serverManagementUseCase.addServers(servers)
                     subscriptionUseCase.updateRefreshResult(subscription, true, servers.size)
@@ -220,30 +235,38 @@ class ServersViewModel @Inject constructor(
     fun onRefreshSubscription(subscription: Subscription) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            logUseCase.i("ServersViewModel", "Refreshing subscription: ${subscription.name}")
-
-            subscriptionFetcher.fetchAndParse(subscription.url, subscription.id)
-                .onSuccess { servers ->
-                    serverManagementUseCase.deleteBySubscription(subscription.id)
-                    serverManagementUseCase.addServers(servers)
-                    subscriptionUseCase.updateRefreshResult(subscription, true, servers.size)
-                    logUseCase.i("ServersViewModel", "Refreshed ${servers.size} servers from ${subscription.name}")
-                }
-                .onFailure { e ->
-                    subscriptionUseCase.updateRefreshResult(subscription, false, 0, e.message)
-                    logUseCase.e("ServersViewModel", "Failed to refresh subscription", e)
-                }
-                .also {
-                    _uiState.update { state -> state.copy(isLoading = false) }
-                }
+            refreshSubscription(subscription)
+            _uiState.update { state -> state.copy(isLoading = false) }
         }
+    }
+
+    /**
+     * Re-pulls [subscription] and replaces its servers. Existing servers for that
+     * subscription are removed first so a refresh cannot accumulate duplicates.
+     */
+    private suspend fun refreshSubscription(subscription: Subscription) {
+        logUseCase.i("ServersViewModel", "Refreshing subscription: ${subscription.name}")
+
+        subscriptionFetcher.fetchAndParse(subscription.url, subscription.id, subscription)
+            .onSuccess { servers ->
+                serverManagementUseCase.deleteBySubscription(subscription.id)
+                serverManagementUseCase.addServers(servers)
+                subscriptionUseCase.updateRefreshResult(subscription, true, servers.size)
+                logUseCase.i("ServersViewModel", "Refreshed ${servers.size} servers from ${subscription.name}")
+            }
+            .onFailure { e ->
+                subscriptionUseCase.updateRefreshResult(subscription, false, 0, e.message)
+                logUseCase.e("ServersViewModel", "Failed to refresh subscription", e)
+            }
     }
 
     fun onRefreshAll() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
+            // Sequentially: each refresh deletes then re-inserts its own servers, and
+            // firing them concurrently made the loading state clear before they finished.
             subscriptionUseCase.getEnabled().first().forEach { sub ->
-                onRefreshSubscription(sub)
+                refreshSubscription(sub)
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -270,20 +293,6 @@ class ServersViewModel @Inject constructor(
 
             _uiState.update { it.copy(isLoading = false) }
             logUseCase.i("ServersViewModel", "Pinged ${allServers.size} servers")
-        }
-    }
-
-    fun onDeleteSubscription(subscription: Subscription) {
-        viewModelScope.launch {
-            serverManagementUseCase.deleteBySubscription(subscription.id)
-            subscriptionUseCase.deleteSubscription(subscription.id)
-            logUseCase.i("ServersViewModel", "Deleted subscription: ${subscription.name}")
-        }
-    }
-
-    fun onToggleSubscriptionEnabled(subscription: Subscription) {
-        viewModelScope.launch {
-            subscriptionUseCase.toggleEnabled(subscription)
         }
     }
 
@@ -322,6 +331,99 @@ class ServersViewModel @Inject constructor(
 
     fun onDismissContextMenu() {
         _uiState.update { it.copy(showServerContextMenu = false, contextMenuServer = null) }
+    }
+
+    // --- Subscription actions (driven by the subscription context menu) ---
+
+    fun onShowSubscriptionMenu(subscription: Subscription) {
+        _uiState.update {
+            it.copy(showSubscriptionContextMenu = true, contextMenuSubscription = subscription)
+        }
+    }
+
+    fun onDismissSubscriptionMenu() {
+        _uiState.update {
+            it.copy(showSubscriptionContextMenu = false, contextMenuSubscription = null)
+        }
+    }
+
+    fun onPinSubscription(subscription: Subscription) {
+        onDismissSubscriptionMenu()
+        viewModelScope.launch {
+            subscriptionUseCase.togglePinned(subscription)
+            logUseCase.i("ServersViewModel", "Pinned subscription: ${subscription.name}")
+        }
+    }
+
+    fun onEditSubscription(subscription: Subscription) {
+        onDismissSubscriptionMenu()
+        _uiState.update {
+            it.copy(showEditSubscriptionDialog = true, editSubscription = subscription)
+        }
+    }
+
+    fun onDismissEditSubscriptionDialog() {
+        _uiState.update {
+            it.copy(showEditSubscriptionDialog = false, editSubscription = null)
+        }
+    }
+
+    fun onUpdateSubscription(name: String, url: String) {
+        val existing = _uiState.value.editSubscription ?: return
+        val trimmedUrl = url.trim()
+        if (trimmedUrl.isEmpty() ||
+            !(trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://"))
+        ) {
+            setImportResult("Invalid subscription URL", isError = true)
+            return
+        }
+        onDismissEditSubscriptionDialog()
+        viewModelScope.launch {
+            val renamed = existing.copy(name = name.trim().ifBlank { existing.name }, url = trimmedUrl)
+            subscriptionUseCase.updateSubscription(renamed)
+            setImportResult("Subscription updated", isError = false)
+            // The link may point at different servers now, so pull it again.
+            refreshSubscription(renamed)
+        }
+    }
+
+    fun onToggleSubscriptionEnabled(subscription: Subscription) {
+        viewModelScope.launch {
+            subscriptionUseCase.toggleEnabled(subscription)
+        }
+    }
+
+    /** Copies the subscription link to the clipboard. */
+    fun onCopySubscriptionUrl(subscription: Subscription) {
+        onDismissSubscriptionMenu()
+        _uiState.update { it.copy(subscriptionLinkToExport = subscription) }
+    }
+
+    /** Called once the screen has written the link to the clipboard. */
+    fun onSubscriptionLinkCopied() {
+        _uiState.update {
+            it.copy(subscriptionLinkToExport = null, importMessage = "Subscription link copied", isImportError = false)
+        }
+    }
+
+    /** Shows the subscription link as a QR code. */
+    fun onExportSubscriptionQr(subscription: Subscription) {
+        onDismissSubscriptionMenu()
+        _uiState.update { it.copy(showSubscriptionQr = true, subscriptionQrPayload = subscription.url) }
+    }
+
+    fun onDismissSubscriptionQr() {
+        _uiState.update { it.copy(showSubscriptionQr = false, subscriptionQrPayload = null) }
+    }
+
+    fun onDeleteSubscription(subscription: Subscription) {
+        onDismissSubscriptionMenu()
+        viewModelScope.launch {
+            serverManagementUseCase.deleteBySubscription(subscription.id)
+            subscriptionUseCase.deleteSubscription(subscription.id)
+            logUseCase.i("ServersViewModel", "Removed subscription: ${subscription.name}")
+            setImportResult("Removed ${subscription.name}", isError = false)
+        }
     }
 
     fun onEditServer(server: Server) {
@@ -371,6 +473,13 @@ data class ServersUiState(
     val isImportError: Boolean = false,
     val showServerContextMenu: Boolean = false,
     val contextMenuServer: Server? = null,
+    val showSubscriptionContextMenu: Boolean = false,
+    val contextMenuSubscription: Subscription? = null,
+    val showEditSubscriptionDialog: Boolean = false,
+    val editSubscription: Subscription? = null,
+    val subscriptionLinkToExport: Subscription? = null,
+    val showSubscriptionQr: Boolean = false,
+    val subscriptionQrPayload: String? = null,
     val showEditServerSheet: Boolean = false,
     val editServer: Server? = null,
     val showShareSheet: Boolean = false,
