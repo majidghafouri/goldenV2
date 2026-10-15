@@ -34,6 +34,7 @@ import androidx.compose.material3.RadioButton
 
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -74,7 +75,8 @@ fun SettingsScreen(
     onNavigateToHome: () -> Unit,
     onNavigateToServers: () -> Unit,
     onNavigateToRouting: () -> Unit,
-    onNavigateToLogs: () -> Unit
+    onNavigateToLogs: () -> Unit,
+    onPrivacyChoicesClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val settings = uiState.settings
@@ -126,6 +128,12 @@ fun SettingsScreen(
         // Advanced Settings
         item {
             AdvancedSettingsSection(settings = settings, viewModel = viewModel)
+        }
+
+        // Privacy: GDPR requires consent to be withdrawable, so the CMP must be
+        // reachable after the first-launch dialog.
+        item {
+            PrivacySection(onPrivacyChoicesClick = onPrivacyChoicesClick)
         }
 
         // Import/Export
@@ -385,6 +393,29 @@ fun SubscriptionSettingsSection(settings: com.goldenv2.core.domain.model.AppSett
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Entry point for the Google User Messaging Platform consent form. GDPR requires that a
+ * consent decision can be changed at any time, so the CMP cannot live only behind the
+ * first-launch dialog.
+ */
+@Composable
+fun PrivacySection(onPrivacyChoicesClick: () -> Unit) {
+    GoldenV2SectionHeader(title = "Privacy")
+
+    GoldenV2Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            SettingRow(
+                title = "Privacy choices",
+                subtitle = "Review or change your data and advertising consent"
+            ) {
+                TextButton(onClick = onPrivacyChoicesClick) {
+                    Text("Review")
+                }
             }
         }
     }
