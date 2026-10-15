@@ -84,10 +84,10 @@ interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions WHERE id = :id")
     fun getById(id: String): Flow<Subscription?>
 
-    @Query("SELECT * FROM subscriptions ORDER BY createdAt DESC")
+    @Query("SELECT * FROM subscriptions ORDER BY isPinned DESC, createdAt DESC")
     fun getAll(): Flow<List<Subscription>>
 
-    @Query("SELECT * FROM subscriptions WHERE isEnabled = 1 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM subscriptions WHERE isEnabled = 1 ORDER BY isPinned DESC, createdAt DESC")
     fun getEnabled(): Flow<List<Subscription>>
 
     @Query("SELECT COUNT(*) FROM subscriptions")

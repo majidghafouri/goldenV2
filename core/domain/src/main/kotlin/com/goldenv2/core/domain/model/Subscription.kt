@@ -16,6 +16,8 @@ data class Subscription(
     val name: String,
     val remark: String? = null,
     val isEnabled: Boolean = true,
+    /** Pinned subscriptions sort above the rest. */
+    val isPinned: Boolean = false,
     val autoRefresh: Boolean = true,
     val refreshIntervalHours: Int = 24,
     @Contextual val lastRefreshAt: Instant? = null,
@@ -40,4 +42,6 @@ data class Subscription(
     )
 
     fun copyEnabled(enabled: Boolean): Subscription = copy(isEnabled = enabled, updatedAt = Instant.now())
+
+    fun copyPinned(pinned: Boolean): Subscription = copy(isPinned = pinned, updatedAt = Instant.now())
 }
