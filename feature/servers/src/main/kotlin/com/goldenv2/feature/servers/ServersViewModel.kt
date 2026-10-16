@@ -255,7 +255,8 @@ fun onAddSubscriptionUrl(url: String) {
                 logUseCase.i("ServersViewModel", "Refreshed ${servers.size} servers from ${subscription.name}")
             }
             .onFailure { e ->
-                subscriptionUseCase.updateRefreshResult(subscription, false, 0, e.message)
+                val reason = com.goldenv2.core.network.SubscriptionFetcher.describeFetchFailure(e)
+                subscriptionUseCase.updateRefreshResult(subscription, false, 0, reason)
                 logUseCase.e("ServersViewModel", "Failed to refresh subscription", e)
             }
     }

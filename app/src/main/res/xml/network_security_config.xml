@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  GoldenV2 does not permit cleartext HTTP.
+
+  Subscription links are the most common place users hit this: a provider or a
+  self-hosted endpoint served over plain http:// is refused by the platform with
+  "CLEARTEXT communication not permitted", which is indistinguishable from a dead
+  link. The failure is now reported as such in the UI.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
