@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -476,6 +477,7 @@ private fun ManualEntrySheet(
         Column(
             modifier = androidx.compose.ui.Modifier
                 .fillMaxWidth()
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(
@@ -555,6 +557,7 @@ private fun DetailedEntrySheet(
             modifier = androidx.compose.ui.Modifier
                 .fillMaxWidth()
                 .verticalScroll(scrollState)
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(
@@ -765,7 +768,7 @@ private fun EditServerSheet(
     var password by rememberSaveable { mutableStateOf(server.password.orEmpty()) }
     var alterId by rememberSaveable { mutableStateOf(server.alterId.toString()) }
     var security by rememberSaveable { mutableStateOf(server.security) }
-    var network by rememberSaveable { mutableStateOf(server.network) }
+    var network by rememberSaveable { mutableStateOf(server.network.name) }
     var tls by rememberSaveable { mutableStateOf(server.tls) }
     var sni by rememberSaveable { mutableStateOf(server.sni.orEmpty()) }
     var fingerprint by rememberSaveable { mutableStateOf(server.fingerprint.orEmpty()) }
@@ -783,6 +786,7 @@ private fun EditServerSheet(
     var remark by rememberSaveable { mutableStateOf(server.remark.orEmpty()) }
     var group by rememberSaveable { mutableStateOf(server.group.orEmpty()) }
 
+    val scrollState = rememberScrollState()
     val protocolEntries = Protocol.values().toList()
     var expanded by remember { mutableStateOf(false) }
 
@@ -793,6 +797,8 @@ private fun EditServerSheet(
         Column(
             modifier = androidx.compose.ui.Modifier
                 .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(
@@ -876,81 +882,81 @@ private fun EditServerSheet(
                     Protocol.VMess -> {
                         FieldRow("UUID", uuid, { uuid = it })
                         FieldRow("Alter ID", alterId, { alterId = it }, KeyboardType.Number)
-                        FieldRow("Security", security)
-                        FieldRow("Network", network.name)
-                        FieldRow("TLS", tls.toString())
-                        FieldRow("SNI", sni)
-                        FieldRow("Fingerprint", fingerprint)
-                        FieldRow("Path", path)
-                        FieldRow("Host", host)
-                        FieldRow("Header Type", headerType)
+                        FieldRow("Security", security, { security = it })
+                        FieldRow("Network", network, { network = it })
+                        FieldRow("TLS", tls.toString(), { tls = it.toBoolean() })
+                        FieldRow("SNI", sni, { sni = it })
+                        FieldRow("Fingerprint", fingerprint, { fingerprint = it })
+                        FieldRow("Path", path, { path = it })
+                        FieldRow("Host", host, { host = it })
+                        FieldRow("Header Type", headerType, { headerType = it })
                     }
                     Protocol.VLESS -> {
-                        FieldRow("UUID", uuid)
-                        FieldRow("Flow", flow)
-                        FieldRow("Network", network.name)
-                        FieldRow("TLS", tls.toString())
-                        FieldRow("SNI", sni)
-                        FieldRow("Fingerprint", fingerprint)
-                        FieldRow("Public Key", publicKey)
-                        FieldRow("Short ID", shortId)
-                        FieldRow("SpiderX", spiderX)
-                        FieldRow("Path", path)
-                        FieldRow("Host", host)
-                        FieldRow("Header Type", headerType)
+                        FieldRow("UUID", uuid, { uuid = it })
+                        FieldRow("Flow", flow, { flow = it })
+                        FieldRow("Network", network, { network = it })
+                        FieldRow("TLS", tls.toString(), { tls = it.toBoolean() })
+                        FieldRow("SNI", sni, { sni = it })
+                        FieldRow("Fingerprint", fingerprint, { fingerprint = it })
+                        FieldRow("Public Key", publicKey, { publicKey = it })
+                        FieldRow("Short ID", shortId, { shortId = it })
+                        FieldRow("SpiderX", spiderX, { spiderX = it })
+                        FieldRow("Path", path, { path = it })
+                        FieldRow("Host", host, { host = it })
+                        FieldRow("Header Type", headerType, { headerType = it })
                     }
                     Protocol.Trojan -> {
-                        FieldRow("Password", password)
-                        FieldRow("Network", network.name)
-                        FieldRow("TLS", tls.toString())
-                        FieldRow("SNI", sni)
-                        FieldRow("Fingerprint", fingerprint)
-                        FieldRow("Path", path)
-                        FieldRow("Host", host)
-                        FieldRow("Header Type", headerType)
+                        FieldRow("Password", password, { password = it })
+                        FieldRow("Network", network, { network = it })
+                        FieldRow("TLS", tls.toString(), { tls = it.toBoolean() })
+                        FieldRow("SNI", sni, { sni = it })
+                        FieldRow("Fingerprint", fingerprint, { fingerprint = it })
+                        FieldRow("Path", path, { path = it })
+                        FieldRow("Host", host, { host = it })
+                        FieldRow("Header Type", headerType, { headerType = it })
                     }
                     Protocol.Shadowsocks -> {
-                        FieldRow("Password (method:pass)", password)
-                        FieldRow("Plugin", plugin)
-                        FieldRow("Plugin Options", pluginOpts)
-                        FieldRow("Obfs", obfs)
-                        FieldRow("Obfs Param", obfsParam)
+                        FieldRow("Password (method:pass)", password, { password = it })
+                        FieldRow("Plugin", plugin, { plugin = it })
+                        FieldRow("Plugin Options", pluginOpts, { pluginOpts = it })
+                        FieldRow("Obfs", obfs, { obfs = it })
+                        FieldRow("Obfs Param", obfsParam, { obfsParam = it })
                     }
                     Protocol.Hysteria2 -> {
-                        FieldRow("Password", password)
-                        FieldRow("SNI", sni)
-                        FieldRow("Obfs", obfs)
-                        FieldRow("Obfs Password", obfsParam)
+                        FieldRow("Password", password, { password = it })
+                        FieldRow("SNI", sni, { sni = it })
+                        FieldRow("Obfs", obfs, { obfs = it })
+                        FieldRow("Obfs Password", obfsParam, { obfsParam = it })
                     }
                     Protocol.Hysteria -> {
-                        FieldRow("Password", password)
-                        FieldRow("SNI", sni)
-                        FieldRow("Obfs", obfs)
-                        FieldRow("Obfs Password", obfsParam)
+                        FieldRow("Password", password, { password = it })
+                        FieldRow("SNI", sni, { sni = it })
+                        FieldRow("Obfs", obfs, { obfs = it })
+                        FieldRow("Obfs Password", obfsParam, { obfsParam = it })
                     }
                     Protocol.Tuic -> {
-                        FieldRow("Password", password)
-                        FieldRow("SNI", sni)
+                        FieldRow("Password", password, { password = it })
+                        FieldRow("SNI", sni, { sni = it })
                     }
                     Protocol.WireGuard -> {
-                        FieldRow("Public Key", publicKey)
-                        FieldRow("Private Key", uuid)
-                        FieldRow("Endpoint", address)
-                        FieldRow("Allowed IPs", host)
+                        FieldRow("Public Key", publicKey, { publicKey = it })
+                        FieldRow("Private Key", uuid, { uuid = it })
+                        FieldRow("Endpoint", address, { address = it })
+                        FieldRow("Allowed IPs", host, { host = it })
                     }
                     Protocol.Ssh -> {
-                        FieldRow("Username", uuid)
-                        FieldRow("Password", password)
-                        FieldRow("Key File", path)
-                        FieldRow("Key Passphrase", host)
+                        FieldRow("Username", uuid, { uuid = it })
+                        FieldRow("Password", password, { password = it })
+                        FieldRow("Key File", path, { path = it })
+                        FieldRow("Key Passphrase", host, { host = it })
                     }
                 }
 
                 Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
 
                 // Common fields
-                FieldRow("Remark", remark)
-                FieldRow("Group", group)
+                FieldRow("Remark", remark, { remark = it })
+                FieldRow("Group", group, { group = it })
 
                 Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
             }
@@ -966,7 +972,7 @@ private fun EditServerSheet(
                         password = password.takeIf { it.isNotBlank() },
                         alterId = alterId.toIntOrNull() ?: server.alterId,
                         security = security,
-                        network = network,
+                        network = NetworkType.entries.firstOrNull { it.name == network } ?: server.network,
                         tls = tls,
                         sni = sni.takeIf { it.isNotBlank() },
                         fingerprint = fingerprint.takeIf { it.isNotBlank() },
@@ -1002,7 +1008,7 @@ private fun EditServerSheet(
 private fun FieldRow(
     label: String,
     value: String,
-    onValueChange: (String) -> Unit = {},
+    onValueChange: (String) -> Unit,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
     OutlinedTextField(
