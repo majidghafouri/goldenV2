@@ -17,7 +17,11 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    // PREFER_SETTINGS keeps these settings-level repositories authoritative while
+    // tolerating project-level repositories added by machine-local init scripts
+    // (e.g. ~/.gradle/init.d mirror fallbacks). FAIL_ON_PROJECT_REPOS made those
+    // scripts a hard build failure.
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         mavenCentral()
