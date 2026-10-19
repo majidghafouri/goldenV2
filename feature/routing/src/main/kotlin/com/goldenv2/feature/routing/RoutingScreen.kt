@@ -1,6 +1,7 @@
 package com.goldenv2.feature.routing
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,9 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -114,32 +115,39 @@ fun RoutingScreen(
             }
         )
 
-        // Preset Routing Modes
-        RoutingModeSelector(
-            selectedMode = uiState.selectedMode,
-            onModeChanged = { viewModel.onRoutingModeChanged(it) }
-        )
+        Column(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Preset Routing Modes
+            RoutingModeSelector(
+                selectedMode = uiState.selectedMode,
+                onModeChanged = { viewModel.onRoutingModeChanged(it) }
+            )
 
-        // Domain Strategy
-        DomainStrategySelector(
-            strategy = uiState.routingConfig.domainStrategy,
-            onStrategyChanged = { viewModel.onDomainStrategyChanged(it) }
-        )
+            // Domain Strategy
+            DomainStrategySelector(
+                strategy = uiState.routingConfig.domainStrategy,
+                onStrategyChanged = { viewModel.onDomainStrategyChanged(it) }
+            )
 
-        // Rules List
-        RulesList(
-            rules = uiState.routingConfig.rules,
-            editingRuleId = uiState.editingRuleId,
-            onAddRule = { viewModel.onAddRule() },
-            onDeleteRule = { viewModel.onDeleteRule(it) },
-            onEditRule = { viewModel.onStartEditingRule(it) },
-            onCancelEdit = { viewModel.onCancelEditing() },
-            onUpdateRule = { viewModel.onUpdateRule(it) },
-            onOutboundTagChanged = { ruleId, tag -> viewModel.onOutboundTagChanged(ruleId, tag) },
-            onDomainChanged = { ruleId, domains -> viewModel.onDomainChanged(ruleId, domains) },
-            onIpChanged = { ruleId, ips -> viewModel.onIpChanged(ruleId, ips) },
-            onReorder = { from, to -> viewModel.onReorderRules(from, to) }
-        )
+            // Rules List
+            RulesList(
+                rules = uiState.routingConfig.rules,
+                editingRuleId = uiState.editingRuleId,
+                onAddRule = { viewModel.onAddRule() },
+                onDeleteRule = { viewModel.onDeleteRule(it) },
+                onEditRule = { viewModel.onStartEditingRule(it) },
+                onCancelEdit = { viewModel.onCancelEditing() },
+                onUpdateRule = { viewModel.onUpdateRule(it) },
+                onOutboundTagChanged = { ruleId, tag -> viewModel.onOutboundTagChanged(ruleId, tag) },
+                onDomainChanged = { ruleId, domains -> viewModel.onDomainChanged(ruleId, domains) },
+                onIpChanged = { ruleId, ips -> viewModel.onIpChanged(ruleId, ips) },
+                onReorder = { from, to -> viewModel.onReorderRules(from, to) }
+            )
+        }
     }
 
     if (showImportDialog) {
@@ -269,11 +277,16 @@ fun RoutingModeOption(
         onClick = onClick
     ) {
         Row(
-            modifier = androidx.compose.ui.Modifier.padding(16.dp),
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = androidx.compose.ui.Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
@@ -316,34 +329,27 @@ fun DomainStrategySelector(
 
             androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(top = 12.dp))
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 DomainStrategy.values().forEach { ds ->
                     val selected = ds == strategy
-                    Card(
+                    Row(
                         modifier = androidx.compose.ui.Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
-                        ),
-                        onClick = { onStrategyChanged(ds) }
+                            .clickable { onStrategyChanged(ds) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = androidx.compose.ui.Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = ds.name,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
-                            RadioButton(
-                                selected = selected,
-                                onClick = { onStrategyChanged(ds) }
-                            )
-                        }
+                        Text(
+                            text = ds.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = androidx.compose.ui.Modifier.weight(1f)
+                        )
+                        RadioButton(
+                            selected = selected,
+                            onClick = { onStrategyChanged(ds) }
+                        )
                     }
                 }
             }
@@ -385,11 +391,11 @@ fun RulesList(
             }
         }
     } else {
-        LazyColumn(
+        Column(
             modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(rules) { rule ->
+            rules.forEach { rule ->
                 val isEditing = editingRuleId == rule.id
                 RuleItem(
                     rule = rule,
