@@ -1229,7 +1229,9 @@ fun SubscriptionSection(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         } else {
                             MaterialTheme.colorScheme.error
-                        }
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -1502,7 +1504,10 @@ fun ServerItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = androidx.compose.ui.Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = getProtocolIcon(server.protocol),
                         contentDescription = null,
@@ -1522,7 +1527,8 @@ fun ServerItem(
                             text = "${server.address}:${server.port}",
                             fontSize = 12.sp,
                             color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -1533,11 +1539,12 @@ fun ServerItem(
                             text = "${server.latency}ms",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = getLatencyColor(server.latency)
+                            color = getLatencyColor(server.latency),
+                            maxLines = 1
                         )
                     } else {
                         androidx.compose.material3.TextButton(onClick = onTestLatency) {
-                            Text(text = "Test", fontSize = 12.sp)
+                            Text(text = "Test", fontSize = 12.sp, maxLines = 1)
                         }
                     }
                     if (selected) {

@@ -469,7 +469,7 @@ fun SelectedServerCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Text(text = "${server.address}:${server.port}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = "${server.address}:${server.port}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             androidx.compose.material3.TextButton(onClick = onChangeClick) {
                 Text(text = "Change", fontSize = 14.sp)
