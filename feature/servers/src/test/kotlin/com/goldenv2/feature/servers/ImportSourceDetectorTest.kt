@@ -41,6 +41,11 @@ class ImportSourceDetectorTest {
     }
 
     @Test
+    fun `ssh link is not a subscription`() {
+        assertFalse(ImportSourceDetector.isSubscriptionUrl("ssh://root@example.com:22?password=secret"))
+    }
+
+    @Test
     fun `scheme is matched case-insensitively`() {
         assertFalse(ImportSourceDetector.isSubscriptionUrl("VLESS://uuid@example.com:443"))
     }

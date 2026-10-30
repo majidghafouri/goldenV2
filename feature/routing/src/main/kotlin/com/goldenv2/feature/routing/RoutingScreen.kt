@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.goldenv2.core.domain.model.DomainStrategy
 import com.goldenv2.core.domain.model.RoutingRule
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
@@ -198,10 +199,10 @@ fun RoutingImportDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
                     OutlinedButton(onClick = onDismiss) {
-                        Text("Cancel")
+                        GoldenV2ButtonText("Cancel")
                     }
                     Button(onClick = { onImport(configText) }, enabled = configText.isNotBlank()) {
-                        Text("Import")
+                        GoldenV2ButtonText("Import")
                     }
                 }
             }
@@ -376,7 +377,7 @@ fun RulesList(
         action = {
             OutlinedButton(onClick = onAddRule) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = null, modifier = androidx.compose.ui.Modifier.padding(end = 8.dp))
-                Text("Add Rule")
+                GoldenV2ButtonText("Add Rule")
             }
         }
     )
@@ -469,7 +470,7 @@ fun RuleItem(
                         horizontalArrangement = Arrangement.End
                     ) {
                         Button(onClick = onCancelEdit) {
-                            Text("Cancel")
+                            GoldenV2ButtonText("Cancel")
                         }
                         androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(start = 8.dp))
                         Button(onClick = {
@@ -481,7 +482,7 @@ fun RuleItem(
                             )
                             onSaveEdit(updated)
                         }) {
-                            Text("Save")
+                            GoldenV2ButtonText("Save")
                         }
                     }
                 }

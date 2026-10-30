@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.goldenv2.core.domain.model.LogEntry
 import com.goldenv2.core.domain.model.LogLevel
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
@@ -244,7 +245,11 @@ fun FilterBar(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "Level: ${filterLevel.name}", fontSize = 12.sp)
+                                GoldenV2ButtonText(
+                                    text = "Level: ${filterLevel.name}",
+                                    fontSize = 12.sp,
+                                    modifier = androidx.compose.ui.Modifier.weight(1f)
+                                )
                                 Icon(
                                     imageVector = Icons.Filled.ExpandMore,
                                     contentDescription = null,
@@ -403,7 +408,7 @@ fun TestResultsCard(
                     onClick = onPingTest,
                     enabled = !isPingTestRunning
                 ) {
-                    Text(if (isPingTestRunning) "Pinging…" else "Ping")
+                    GoldenV2ButtonText(if (isPingTestRunning) "Pinging…" else "Ping")
                 }
             }
 

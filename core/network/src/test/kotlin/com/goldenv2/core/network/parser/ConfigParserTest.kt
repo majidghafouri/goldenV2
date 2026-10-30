@@ -142,6 +142,50 @@ class ConfigParserTest {
     }
 
     @Test
+    fun `parse SSH URI with userinfo`() {
+        val uri = "ssh://root:s3cret@example.com:2222#My%20SSH"
+
+        val result = ConfigParserRegistry.parse(uri)
+
+        assertTrue(result is ParseResult.Success)
+        val server = (result as ParseResult.Success).server
+        assertEquals(Protocol.Ssh, server.protocol)
+        assertEquals("example.com", server.address)
+        assertEquals(2222, server.port)
+        assertEquals("root", server.uuid)
+        assertEquals("s3cret", server.password)
+        assertEquals("My SSH", server.name)
+    }
+
+    @Test
+    fun `parse SSH URI with credentials as query parameters`() {
+        val uri = "ssh://example.com:22?username=root&password=s3cret#My%20SSH"
+
+        val result = ConfigParserRegistry.parse(uri)
+
+        assertTrue(result is ParseResult.Success)
+        val server = (result as ParseResult.Success).server
+        assertEquals(Protocol.Ssh, server.protocol)
+        assertEquals("example.com", server.address)
+        assertEquals(22, server.port)
+        assertEquals("root", server.uuid)
+        assertEquals("s3cret", server.password)
+        assertEquals("My SSH", server.name)
+    }
+
+    @Test
+    fun `parse SSH URI with encoded credentials`() {
+        val uri = "ssh://us%65r:p%40ss%3Aword@example.com:22"
+
+        val result = ConfigParserRegistry.parse(uri)
+
+        assertTrue(result is ParseResult.Success)
+        val server = (result as ParseResult.Success).server
+        assertEquals("user", server.uuid)
+        assertEquals("p@ss:word", server.password)
+    }
+
+    @Test
     fun `parse subscription content`() {
         val server1Json = """{"v":"2","ps":"Server1","add":"server1.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","scy":"auto","net":"tcp","type":"none","tls":"tls"}"""
         val server2Json = """{"v":"2","ps":"Server2","add":"server2.com","port":"8443","id":"22222222-2222-2222-2222-222222222222","aid":"0","scy":"auto","net":"tcp","type":"none","tls":"tls"}"""

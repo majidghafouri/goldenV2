@@ -62,6 +62,7 @@ import com.goldenv2.core.domain.model.DnsStrategy
 import com.goldenv2.core.domain.model.LogLevel
 import com.goldenv2.core.domain.model.ThemeMode
 import com.goldenv2.core.domain.model.VpnMode
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
@@ -414,7 +415,7 @@ fun PrivacySection(onPrivacyChoicesClick: () -> Unit) {
                 subtitle = "Review or change your data and advertising consent"
             ) {
                 TextButton(onClick = onPrivacyChoicesClick) {
-                    Text("Review")
+                    GoldenV2ButtonText("Review")
                 }
             }
         }
@@ -458,7 +459,7 @@ fun LoggingSettingsSection(settings: com.goldenv2.core.domain.model.AppSettings,
                 horizontalArrangement = Arrangement.End
             ) {
                 Button(onClick = { viewModel.onClearLogs() }) {
-                    Text("Clear Logs")
+                    GoldenV2ButtonText("Clear Logs")
                 }
             }
         }
@@ -523,16 +524,22 @@ fun ImportExportSection(viewModel: SettingsViewModel) {
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(onClick = {
-                    val json = viewModel.onExportConfig()
-                    val clipboard = context.getSystemService(ClipboardManager::class.java)
-                    clipboard?.setPrimaryClip(ClipData.newPlainText("config", json))
-                    android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
-                }) {
-                    Text("Export Config")
+                OutlinedButton(
+                    onClick = {
+                        val json = viewModel.onExportConfig()
+                        val clipboard = context.getSystemService(ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("config", json))
+                        android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
+                ) {
+                    GoldenV2ButtonText("Export Config")
                 }
-                OutlinedButton(onClick = { showImportDialog = true }) {
-                    Text("Import Config")
+                OutlinedButton(
+                    onClick = { showImportDialog = true },
+                    modifier = androidx.compose.ui.Modifier.weight(1f)
+                ) {
+                    GoldenV2ButtonText("Import Config")
                 }
             }
         }
@@ -586,10 +593,10 @@ fun ImportConfigDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
                     OutlinedButton(onClick = onDismiss) {
-                        Text("Cancel")
+                        GoldenV2ButtonText("Cancel")
                     }
                     Button(onClick = { onImport(configText) }, enabled = configText.isNotBlank()) {
-                        Text("Import")
+                        GoldenV2ButtonText("Import")
                     }
                 }
             }
@@ -642,7 +649,7 @@ fun DropdownSelector(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = selectedText, fontSize = 14.sp)
+                    GoldenV2ButtonText(text = selectedText, fontSize = 14.sp, modifier = androidx.compose.ui.Modifier.weight(1f))
                     Icon(
                         imageVector = Icons.Filled.ExpandMore,
                         contentDescription = null,

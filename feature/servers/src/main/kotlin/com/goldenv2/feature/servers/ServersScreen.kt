@@ -71,6 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -88,6 +89,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -102,10 +104,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.goldenv2.core.domain.model.NetworkType
 import com.goldenv2.core.domain.model.Protocol
 import com.goldenv2.core.domain.model.Server
 import com.goldenv2.core.domain.model.Subscription
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2EmptyState
 import com.goldenv2.core.ui.component.GoldenV2IconButton
@@ -226,7 +230,7 @@ fun ServersScreen(
                     )
                     Spacer(modifier = androidx.compose.ui.Modifier.height(8.dp))
                     TextButton(onClick = { viewModel.onAddServer() }) {
-                        Text(text = "Add a server", fontWeight = FontWeight.Medium)
+                        GoldenV2ButtonText(text = "Add a server", fontWeight = FontWeight.Medium)
                     }
                 }
             } else {
@@ -506,7 +510,7 @@ private fun ManualEntrySheet(
                 enabled = text.isNotBlank(),
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth()
             ) {
-                Text("Add servers")
+                GoldenV2ButtonText("Add servers")
             }
             Spacer(modifier = androidx.compose.ui.Modifier.height(24.dp))
         }
@@ -746,7 +750,7 @@ private fun DetailedEntrySheet(
                 enabled = name.isNotBlank() && address.isNotBlank() && port.isNotBlank(),
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth()
             ) {
-                Text("Add Server")
+                GoldenV2ButtonText("Add Server")
             }
             Spacer(modifier = androidx.compose.ui.Modifier.height(24.dp))
         }
@@ -790,9 +794,91 @@ private fun EditServerSheet(
     val protocolEntries = Protocol.values().toList()
     var expanded by remember { mutableStateOf(false) }
 
+    val hasChanges = name != server.name ||
+        protocol != server.protocol ||
+        address != server.address ||
+        port != server.port.toString() ||
+        uuid != server.uuid.orEmpty() ||
+        password != server.password.orEmpty() ||
+        alterId != server.alterId.toString() ||
+        security != server.security ||
+        network != server.network.name ||
+        tls != server.tls ||
+        sni != server.sni.orEmpty() ||
+        fingerprint != server.fingerprint.orEmpty() ||
+        path != server.path.orEmpty() ||
+        host != server.host.orEmpty() ||
+        headerType != server.headerType.orEmpty() ||
+        flow != server.flow.orEmpty() ||
+        publicKey != server.publicKey.orEmpty() ||
+        shortId != server.shortId.orEmpty() ||
+        spiderX != server.spiderX.orEmpty() ||
+        obfs != server.obfs.orEmpty() ||
+        obfsParam != server.obfsParam.orEmpty() ||
+        plugin != server.plugin.orEmpty() ||
+        pluginOpts != server.pluginOpts.orEmpty() ||
+        remark != server.remark.orEmpty() ||
+        group != server.group.orEmpty()
+
+    val isValid = name.isNotBlank() && address.isNotBlank() && port.isNotBlank()
+    val showLeaveDialog = remember { mutableStateOf(false) }
+    val hasChangesState = rememberUpdatedState(hasChanges)
+    val confirmDismiss = remember {
+        { value: SheetValue ->
+            if (value == SheetValue.Hidden && hasChangesState.value) {
+                showLeaveDialog.value = true
+                false
+            } else {
+                true
+            }
+        }
+    }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = confirmDismiss
+    )
+
+    fun buildUpdatedServer() = server.copy(
+        name = name,
+        protocol = protocol,
+        address = address,
+        port = port.toIntOrNull() ?: server.port,
+        uuid = uuid.takeIf { it.isNotBlank() },
+        password = password.takeIf { it.isNotBlank() },
+        alterId = alterId.toIntOrNull() ?: server.alterId,
+        security = security,
+        network = NetworkType.entries.firstOrNull { it.name == network } ?: server.network,
+        tls = tls,
+        sni = sni.takeIf { it.isNotBlank() },
+        fingerprint = fingerprint.takeIf { it.isNotBlank() },
+        path = path.takeIf { it.isNotBlank() },
+        host = host.takeIf { it.isNotBlank() },
+        headerType = headerType.takeIf { it.isNotBlank() },
+        flow = flow.takeIf { it.isNotBlank() },
+        publicKey = publicKey.takeIf { it.isNotBlank() },
+        shortId = shortId.takeIf { it.isNotBlank() },
+        spiderX = spiderX.takeIf { it.isNotBlank() },
+        obfs = obfs.takeIf { it.isNotBlank() },
+        obfsParam = obfsParam.takeIf { it.isNotBlank() },
+        plugin = plugin.takeIf { it.isNotBlank() },
+        pluginOpts = pluginOpts.takeIf { it.isNotBlank() },
+        remark = remark.takeIf { it.isNotBlank() },
+        group = group.takeIf { it.isNotBlank() },
+        updatedAt = java.time.Instant.now()
+    )
+
+    fun saveChanges() {
+        if (!isValid) return
+        val updatedServer = buildUpdatedServer()
+        onDismiss()
+        onUpdate(updatedServer)
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        onDismissRequest = {
+            if (hasChanges) showLeaveDialog.value = true else onDismiss()
+        },
+        sheetState = sheetState
     ) {
         Column(
             modifier = androidx.compose.ui.Modifier
@@ -962,45 +1048,29 @@ private fun EditServerSheet(
             }
 
             Button(
-                onClick = {
-                    val updatedServer = server.copy(
-                        name = name,
-                        protocol = protocol,
-                        address = address,
-                        port = port.toIntOrNull() ?: server.port,
-                        uuid = uuid.takeIf { it.isNotBlank() },
-                        password = password.takeIf { it.isNotBlank() },
-                        alterId = alterId.toIntOrNull() ?: server.alterId,
-                        security = security,
-                        network = NetworkType.entries.firstOrNull { it.name == network } ?: server.network,
-                        tls = tls,
-                        sni = sni.takeIf { it.isNotBlank() },
-                        fingerprint = fingerprint.takeIf { it.isNotBlank() },
-                        path = path.takeIf { it.isNotBlank() },
-                        host = host.takeIf { it.isNotBlank() },
-                        headerType = headerType.takeIf { it.isNotBlank() },
-                        flow = flow.takeIf { it.isNotBlank() },
-                        publicKey = publicKey.takeIf { it.isNotBlank() },
-                        shortId = shortId.takeIf { it.isNotBlank() },
-                        spiderX = spiderX.takeIf { it.isNotBlank() },
-                        obfs = obfs.takeIf { it.isNotBlank() },
-                        obfsParam = obfsParam.takeIf { it.isNotBlank() },
-                        plugin = plugin.takeIf { it.isNotBlank() },
-                        pluginOpts = pluginOpts.takeIf { it.isNotBlank() },
-                        remark = remark.takeIf { it.isNotBlank() },
-                        group = group.takeIf { it.isNotBlank() },
-                        updatedAt = java.time.Instant.now()
-                    )
-                    onDismiss()
-                    onUpdate(updatedServer)
-                },
-                enabled = name.isNotBlank() && address.isNotBlank() && port.isNotBlank(),
+                onClick = { saveChanges() },
+                enabled = isValid,
                 modifier = androidx.compose.ui.Modifier.fillMaxWidth()
             ) {
-                Text("Save Changes")
+                GoldenV2ButtonText("Save Changes")
             }
             Spacer(modifier = androidx.compose.ui.Modifier.height(24.dp))
         }
+    }
+
+    if (showLeaveDialog.value) {
+        UnsavedChangesDialog(
+            canApply = isValid,
+            onKeepEditing = { showLeaveDialog.value = false },
+            onDiscard = {
+                showLeaveDialog.value = false
+                onDismiss()
+            },
+            onApply = {
+                showLeaveDialog.value = false
+                saveChanges()
+            }
+        )
     }
 }
 
@@ -1067,12 +1137,12 @@ private fun AddSubscriptionDialog(
                 },
                 enabled = url.isNotBlank()
             ) {
-                Text("Add")
+                GoldenV2ButtonText("Add")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                GoldenV2ButtonText("Cancel")
             }
         }
     )
@@ -1544,7 +1614,7 @@ fun ServerItem(
                         )
                     } else {
                         androidx.compose.material3.TextButton(onClick = onTestLatency) {
-                            Text(text = "Test", fontSize = 12.sp, maxLines = 1)
+                            GoldenV2ButtonText(text = "Test", fontSize = 12.sp)
                         }
                     }
                     if (selected) {
@@ -1632,7 +1702,7 @@ fun ServerContextMenu(
             }
             Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                GoldenV2ButtonText("Cancel")
             }
         }
     }
@@ -1670,9 +1740,15 @@ fun EditSubscriptionDialog(
 ) {
     var name by remember { mutableStateOf(subscription.name) }
     var url by remember { mutableStateOf(subscription.url) }
+    val hasChanges = name != subscription.name || url != subscription.url
+    val showLeaveDialog = remember { mutableStateOf(false) }
+
+    fun requestDismiss() {
+        if (hasChanges) showLeaveDialog.value = true else onDismiss()
+    }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { requestDismiss() },
         title = { Text("Edit subscription") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1693,12 +1769,84 @@ fun EditSubscriptionDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name, url) }) { Text("Save") }
+            TextButton(onClick = { onSave(name, url) }) { GoldenV2ButtonText("Save") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = { requestDismiss() }) { GoldenV2ButtonText("Cancel") }
         }
     )
+
+    if (showLeaveDialog.value) {
+        UnsavedChangesDialog(
+            onKeepEditing = { showLeaveDialog.value = false },
+            onDiscard = {
+                showLeaveDialog.value = false
+                onDismiss()
+            },
+            onApply = {
+                showLeaveDialog.value = false
+                onSave(name, url)
+            }
+        )
+    }
+}
+
+/**
+ * Asks what to do when an edited config would be closed with unsaved changes.
+ * The actions are stacked so they stay readable at large system font scales.
+ */
+@Composable
+private fun UnsavedChangesDialog(
+    onKeepEditing: () -> Unit,
+    onDiscard: () -> Unit,
+    onApply: () -> Unit,
+    canApply: Boolean = true
+) {
+    Dialog(onDismissRequest = onKeepEditing) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Unsaved changes",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "You changed this configuration but have not saved it yet. " +
+                        "Do you want to apply the changes or leave without saving?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = onApply,
+                    enabled = canApply,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GoldenV2ButtonText("Apply changes")
+                }
+                TextButton(
+                    onClick = onKeepEditing,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GoldenV2ButtonText("Keep editing")
+                }
+                TextButton(
+                    onClick = onDiscard,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GoldenV2ButtonText("Discard changes", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
 }
 
 /** Renders a subscription link as a QR code so it can be shared or imported elsewhere. */
@@ -1748,7 +1896,7 @@ fun SubscriptionQrDialog(payload: String, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { GoldenV2ButtonText("Close") }
         }
     )
 }

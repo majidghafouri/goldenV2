@@ -398,44 +398,68 @@ class SshParser : BaseParser() {
 
     override fun parse(uri: String): ParseResult {
         return try {
-            val withoutScheme = uri.removePrefix("ssh://")
-            val hashIndex = withoutScheme.indexOf('#')
-            val mainPart = if (hashIndex != -1) withoutScheme.substring(0, hashIndex) else withoutScheme
-            val name = if (hashIndex != -1) URLDecoder.decode(withoutScheme.substring(hashIndex + 1), StandardCharsets.UTF_8.name()) else "SSH Server"
+            val schemeEnd = uri.indexOf("://")
+            if (schemeEnd == -1) return ParseResult.Failure("Invalid SSH format: missing scheme")
 
-            val atIndex = mainPart.indexOf('@')
-            if (atIndex == -1) return ParseResult.Failure("Invalid SSH format: missing @")
-
-            val userInfo = mainPart.substring(0, atIndex)
-            val hostPortQuery = mainPart.substring(atIndex + 1)
-
-            val queryStart = hostPortQuery.indexOf('?')
-            val hostPort = if (queryStart != -1) hostPortQuery.substring(0, queryStart) else hostPortQuery
-            val query = if (queryStart != -1) hostPortQuery.substring(queryStart) else ""
-
-            val (address, port) = extractHostPort(hostPort)
-            val params = parseQueryParams(query)
-
-            val (username, password) = if (userInfo.contains(":")) {
-                val parts = userInfo.split(":", limit = 2)
-                parts[0] to parts[1]
+            val raw = uri.substring(schemeEnd + 3)
+            val hashIndex = raw.indexOf('#')
+            val mainPart = if (hashIndex != -1) raw.substring(0, hashIndex) else raw
+            val name = if (hashIndex != -1) {
+                decodeSshComponent(raw.substring(hashIndex + 1)).ifBlank { "SSH Server" }
             } else {
-                userInfo to ""
+                "SSH Server"
             }
 
-            val id = generateId()
+            val queryStart = mainPart.indexOf('?')
+            val authorityPart = if (queryStart != -1) mainPart.substring(0, queryStart) else mainPart
+            val query = if (queryStart != -1) mainPart.substring(queryStart) else ""
+            val params = parseQueryParams(query)
+
+            // Some generators emit the username and password as query parameters
+            // (`ssh://host:22?username=root&password=...`) while others use the
+            // standard userinfo section (`ssh://root:password@host:22`). Support both,
+            // and prefer userinfo when both are present.
+            val authority = authorityPart.trimEnd('/')
+            val atIndex = authority.lastIndexOf('@')
+            val userInfo = if (atIndex != -1) authority.substring(0, atIndex) else ""
+            val hostPort = if (atIndex != -1) authority.substring(atIndex + 1) else authority
+            if (hostPort.isBlank()) return ParseResult.Failure("Invalid SSH format: missing host")
+
+            val (address, port) = extractHostPort(hostPort)
+            if (address.isBlank()) return ParseResult.Failure("Invalid SSH format: missing host")
+
+            val userInfoParts = userInfo.split(":", limit = 2)
+            val userInfoUsername = decodeSshComponent(userInfoParts.getOrNull(0).orEmpty())
+            val userInfoPassword = decodeSshComponent(userInfoParts.getOrNull(1).orEmpty())
+
+            val username = userInfoUsername.takeIf { it.isNotBlank() }
+                ?: params["username"]
+                ?: params["user"]
+                ?: params["login"]
+                ?: ""
+            val password = userInfoPassword.takeIf { it.isNotBlank() }
+                ?: params["password"]
+                ?: params["pass"]
+                ?: params["pwd"]
+                ?: ""
             val keyFile = params["keyfile"]
+                ?: params["key"]
+                ?: params["privatekey"]
+                ?: params["private-key"]
             val keyPassphrase = params["keypass"]
+                ?: params["passphrase"]
+                ?: params["keypassphrase"]
+                ?: params["key-passphrase"]
 
             val server = Server(
-                id = id,
+                id = generateId(),
                 subscriptionId = "",
                 name = name,
                 protocol = Protocol.Ssh,
                 address = address,
                 port = port,
-                uuid = username,
-                password = password,
+                uuid = username.takeIf { it.isNotBlank() },
+                password = password.takeIf { it.isNotBlank() },
                 path = keyFile,
                 host = keyPassphrase,
                 group = parseFragment(uri)
@@ -444,6 +468,12 @@ class SshParser : BaseParser() {
         } catch (e: Exception) {
             ParseResult.Failure("Failed to parse SSH: ${e.message}")
         }
+    }
+
+    private fun decodeSshComponent(value: String): String = try {
+        URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+    } catch (e: Exception) {
+        value
     }
 }
 

@@ -10,7 +10,7 @@ package com.goldenv2.feature.servers
 object ImportSourceDetector {
 
     private val SERVER_SCHEME = Regex(
-        "(vmess|vless|trojan|ss|ssr|hysteria2?|tuic|wireguard|socks)://",
+        "(vmess|vless|trojan|ss|ssr|hysteria2?|tuic|wireguard|socks|ssh)://",
         RegexOption.IGNORE_CASE
     )
 

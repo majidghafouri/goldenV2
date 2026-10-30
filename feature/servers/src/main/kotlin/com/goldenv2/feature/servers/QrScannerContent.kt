@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -88,10 +89,10 @@ fun QrScannerContent(
                 onClick = { permissionState.launchPermissionRequest() },
                 modifier = Modifier.padding(top = 24.dp)
             ) {
-                Text("Grant permission")
+                GoldenV2ButtonText("Grant permission")
             }
             TextButton(onClick = onClose) {
-                Text("Cancel")
+                GoldenV2ButtonText("Cancel")
             }
         }
         return

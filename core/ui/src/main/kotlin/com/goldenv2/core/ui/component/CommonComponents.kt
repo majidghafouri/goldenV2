@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -55,6 +57,34 @@ fun GoldenV2TopAppBar(
         navigationIcon = navigationIcon ?: {},
         actions = actions,
         colors = colors
+    )
+}
+
+/**
+ * Label for a button.
+ *
+ * Button labels stay on one line even when the device font scale is large: a wrapped
+ * label makes the button look broken and can push its content outside the touch target.
+ * Long labels are ellipsized instead of wrapped.
+ */
+@Composable
+fun GoldenV2ButtonText(
+    text: String,
+    modifier: Modifier = Modifier,
+    fontWeight: FontWeight? = null,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    color: Color = Color.Unspecified
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+        fontWeight = fontWeight,
+        fontSize = fontSize,
+        color = color
     )
 }
 
@@ -153,7 +183,7 @@ fun GoldenV2EmptyState(
             )
             actionText?.let { text ->
                 Button(onClick = onAction!!, modifier = Modifier.padding(top = 8.dp)) {
-                    Text(text = text)
+                    GoldenV2ButtonText(text = text)
                 }
             }
         }

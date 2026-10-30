@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.goldenv2.core.domain.model.VpnStatus
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.goldenv2.core.ui.component.GoldenV2Card
 import com.goldenv2.core.ui.component.GoldenV2IconButton
 import com.goldenv2.core.ui.component.GoldenV2SectionHeader
@@ -275,7 +276,7 @@ fun ConnectionStatusCard(
                 )
             } else {
                 androidx.compose.material3.TextButton(onClick = onServerClick) {
-                    Text(text = "Select Server", fontSize = 14.sp)
+                    GoldenV2ButtonText(text = "Select Server", fontSize = 14.sp)
                 }
             }
 
@@ -304,7 +305,7 @@ fun ConnectionStatusCard(
                             )
                             androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(end = 12.dp))
                         }
-                        Text(
+                        GoldenV2ButtonText(
                             text = if (isConnected) "Disconnect" else if (isConnecting) "Connecting…" else "Connect",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium
@@ -432,7 +433,7 @@ fun QuickActionButton(icon: ImageVector, label: String, onClick: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = androidx.compose.ui.Modifier.size(28.dp))
-            Text(text = label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+            GoldenV2ButtonText(text = label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -472,7 +473,7 @@ fun SelectedServerCard(
                 Text(text = "${server.address}:${server.port}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             androidx.compose.material3.TextButton(onClick = onChangeClick) {
-                Text(text = "Change", fontSize = 14.sp)
+                GoldenV2ButtonText(text = "Change", fontSize = 14.sp)
             }
         }
     }
@@ -526,13 +527,13 @@ private fun ConsentDialog(
                         onClick = onDecline,
                         modifier = androidx.compose.ui.Modifier.weight(1f)
                     ) {
-                        Text("Decline")
+                        GoldenV2ButtonText("Decline")
                     }
                     Button(
                         onClick = onAccept,
                         modifier = androidx.compose.ui.Modifier.weight(1f)
                     ) {
-                        Text("Accept")
+                        GoldenV2ButtonText("Accept")
                     }
                 }
             }

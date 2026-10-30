@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.goldenv2.core.ui.component.GoldenV2ButtonText
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.common.BitMatrix
@@ -160,7 +161,7 @@ fun ShareServerSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
             TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                Text("Close")
+                GoldenV2ButtonText("Close")
             }
         }
     }

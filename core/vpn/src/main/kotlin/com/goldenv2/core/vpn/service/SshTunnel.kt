@@ -14,8 +14,6 @@ import org.apache.sshd.common.util.OsUtils
 import org.apache.sshd.common.util.net.SshdSocketAddress
 import org.apache.sshd.common.util.security.SecurityUtils
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -130,7 +128,7 @@ class SshTunnel(
                     val keyPair = SecurityUtils.loadKeyPairIdentities(
                         sess,
                         NamedResource.ofName(keyFile),
-                        Files.newInputStream(Paths.get(keyFile)),
+                        File(keyFile).inputStream(),
                         FilePasswordProvider.of(server.host ?: "")
                     ).firstOrNull() ?: return "Failed to load SSH key pair from $keyFile"
                     sess.addPublicKeyIdentity(keyPair)
