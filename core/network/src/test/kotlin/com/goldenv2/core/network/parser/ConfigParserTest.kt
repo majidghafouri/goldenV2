@@ -186,6 +186,34 @@ class ConfigParserTest {
     }
 
     @Test
+    fun `parse SSH URI with base64 encoded userinfo`() {
+        val uri = "ssh://cm9vdDp1QXVQWmtKMW9fZlNlVE8wRQ%3D%3D@31.56.27.149:22#L%20ssh"
+
+        val result = ConfigParserRegistry.parse(uri)
+
+        assertTrue(result is ParseResult.Success)
+        val server = (result as ParseResult.Success).server
+        assertEquals(Protocol.Ssh, server.protocol)
+        assertEquals("31.56.27.149", server.address)
+        assertEquals(22, server.port)
+        assertEquals("root", server.uuid)
+        assertEquals("uAuPZkJ1o_fSeTO0E", server.password)
+        assertEquals("L ssh", server.name)
+    }
+
+    @Test
+    fun `parse SSH URI with unpadded base64 encoded userinfo`() {
+        val uri = "ssh://cm9vdDp1QXVQWmtKMW9fZlNlVE8wRQ@31.56.27.149:22"
+
+        val result = ConfigParserRegistry.parse(uri)
+
+        assertTrue(result is ParseResult.Success)
+        val server = (result as ParseResult.Success).server
+        assertEquals("root", server.uuid)
+        assertEquals("uAuPZkJ1o_fSeTO0E", server.password)
+    }
+
+    @Test
     fun `parse subscription content`() {
         val server1Json = """{"v":"2","ps":"Server1","add":"server1.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","scy":"auto","net":"tcp","type":"none","tls":"tls"}"""
         val server2Json = """{"v":"2","ps":"Server2","add":"server2.com","port":"8443","id":"22222222-2222-2222-2222-222222222222","aid":"0","scy":"auto","net":"tcp","type":"none","tls":"tls"}"""
