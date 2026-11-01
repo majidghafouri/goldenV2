@@ -189,6 +189,27 @@ class ServerUriSerializerTest {
     }
 
     @Test
+    fun `round trip SSH server with special characters in credentials`() {
+        val server = Server(
+            subscriptionId = "",
+            name = "My SSH",
+            protocol = Protocol.Ssh,
+            address = "ssh.example.com",
+            port = 22,
+            uuid = "user@example.com",
+            password = "p@ss:word#1"
+        )
+
+        val uri = ServerUriSerializer.toUri(server)
+        val result = ConfigParserRegistry.parse(uri)
+
+        assertTrue(result is ParseResult.Success)
+        val parsed = (result as ParseResult.Success).server
+        assertEquals("user@example.com", parsed.uuid)
+        assertEquals("p@ss:word#1", parsed.password)
+    }
+
+    @Test
     fun `hysteria1 uri format`() {
         val server = Server(
             subscriptionId = "",

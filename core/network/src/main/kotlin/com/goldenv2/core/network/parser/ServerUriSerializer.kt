@@ -174,10 +174,11 @@ object ServerUriSerializer {
     }
 
     private fun sshUri(server: Server): String {
+        val encodedUser = URLEncoder.encode(server.uuid.orEmpty(), StandardCharsets.UTF_8.name())
         val userInfo = if (!server.password.isNullOrBlank()) {
-            "${server.uuid.orEmpty()}:${server.password}"
+            "$encodedUser:${URLEncoder.encode(server.password, StandardCharsets.UTF_8.name())}"
         } else {
-            server.uuid.orEmpty()
+            encodedUser
         }
         val params = listOf(
             "keyfile" to server.path,
