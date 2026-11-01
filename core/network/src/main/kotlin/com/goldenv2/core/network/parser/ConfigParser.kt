@@ -428,9 +428,18 @@ class SshParser : BaseParser() {
             val (address, port) = extractHostPort(hostPort)
             if (address.isBlank()) return ParseResult.Failure("Invalid SSH format: missing host")
 
-            val userInfoParts = userInfo.split(":", limit = 2)
-            val userInfoUsername = decodeSshComponent(userInfoParts.getOrNull(0).orEmpty())
-            val userInfoPassword = decodeSshComponent(userInfoParts.getOrNull(1).orEmpty())
+            // Some generators base64-encode the whole `user:password` pair inside
+            // the userinfo section (`ssh://<base64>@host`). Decode it when the
+            // decoded value contains the credential separator.
+            val decodedUserInfo = decodeSshComponent(userInfo)
+            val credentials = when {
+                decodedUserInfo.contains(':') -> decodedUserInfo
+                else -> decodeBase64UserInfo(decodedUserInfo)?.takeIf { it.contains(':') }
+                    ?: decodedUserInfo
+            }
+            val userInfoParts = credentials.split(":", limit = 2)
+            val userInfoUsername = userInfoParts.getOrNull(0).orEmpty()
+            val userInfoPassword = userInfoParts.getOrNull(1).orEmpty()
 
             val username = userInfoUsername.takeIf { it.isNotBlank() }
                 ?: params["username"]
@@ -474,6 +483,17 @@ class SshParser : BaseParser() {
         URLDecoder.decode(value, StandardCharsets.UTF_8.name())
     } catch (e: Exception) {
         value
+    }
+
+    private fun decodeBase64UserInfo(value: String): String? = try {
+        val normalized = value.trim()
+            .replace('-', '+')
+            .replace('_', '/')
+        val padded = normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '=')
+        String(Base64.getDecoder().decode(padded), StandardCharsets.UTF_8)
+            .takeIf { it.none { char -> char.isISOControl() } }
+    } catch (e: Exception) {
+        null
     }
 }
 
