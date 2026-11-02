@@ -33,7 +33,7 @@ class AdFrequencyManager @Inject constructor(
     private companion object {
         private const val PREFS_NAME = "ads_frequency"
         private const val KEY_CONNECT_PRESSES = "connect_presses"
-        private const val GRACE_USAGE_COUNT = 50L
+        private const val GRACE_USAGE_COUNT = 5L
         private const val SHOW_EVERY_N_PRESSES = 3L
     }
 }
